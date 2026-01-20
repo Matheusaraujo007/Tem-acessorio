@@ -83,7 +83,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setUsers(uRes);
       setEstablishments(eRes);
       
-      if (confRes && Object.keys(confRes).length > 0) {
+      if (confRes && typeof confRes === 'object') {
         setSystemConfig({
           companyName: confRes.company_name || 'ERP Retail',
           logoUrl: confRes.logo_url || '',
@@ -131,11 +131,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error(errData.error || "Erro ao salvar no servidor");
       }
       
-      // 2. Sincroniza os dados finais do banco
+      // 2. Força um refresh para garantir sincronia com as colunas do DB
       await refreshData();
     } catch (error) {
       console.error("Falha ao salvar configuração:", error);
-      alert("Ocorreu um problema ao salvar no banco de dados, mas a alteração visual foi aplicada temporariamente.");
+      alert("Ocorreu um problema ao salvar no banco de dados.");
     }
   };
 

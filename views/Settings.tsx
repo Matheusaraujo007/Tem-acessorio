@@ -16,7 +16,6 @@ const Settings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // States locais para formulários
   const [localConfig, setLocalConfig] = useState(systemConfig);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
@@ -39,7 +38,7 @@ const Settings: React.FC = () => {
       await updateConfig(localConfig);
       setTimeout(() => setIsSaving(false), 800);
     } catch (e) {
-      alert("Erro ao salvar.");
+      alert("Erro ao salvar identidade.");
       setIsSaving(false);
     }
   };
@@ -55,6 +54,11 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleEditUser = (u: User) => {
+    setUserForm(u);
+    setShowUserModal(true);
+  };
+
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const newUser: User = {
@@ -65,6 +69,11 @@ const Settings: React.FC = () => {
     await addUser(newUser);
     setShowUserModal(false);
     setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: 'matriz', active: true });
+  };
+
+  const handleEditStore = (e: Establishment) => {
+    setStoreForm(e);
+    setShowStoreModal(true);
   };
 
   const handleSaveStore = async (e: React.FormEvent) => {
@@ -187,12 +196,11 @@ const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* Outras abas permanecem iguais */}
         {activeTab === 'users' && (
            <div className="space-y-6 animate-in slide-in-from-top-4">
               <div className="flex justify-between items-center">
                  <h3 className="text-xl font-black uppercase tracking-tight">Equipe Cadastrada</h3>
-                 <button onClick={() => setShowUserModal(true)} className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+                 <button onClick={() => { setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: 'matriz', active: true }); setShowUserModal(true); }} className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
                     <span className="material-symbols-outlined">person_add</span> Novo Usuário
                  </button>
               </div>
@@ -212,7 +220,7 @@ const Settings: React.FC = () => {
                           <tr key={u.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all">
                              <td className="px-10 py-6">
                                 <div className="flex items-center gap-4">
-                                   <div className="size-10 rounded-full bg-slate-200 dark:bg-slate-700 bg-cover" style={{backgroundImage: `url(${u.avatar || 'https://picsum.photos/seed/'+u.id+'/100/100'})`}}></div>
+                                   <div className="size-10 rounded-full bg-slate-200 dark:bg-slate-700 bg-cover shadow-inner" style={{backgroundImage: `url(${u.avatar || 'https://picsum.photos/seed/'+u.id+'/100/100'})`}}></div>
                                    <div>
                                       <p className="text-sm font-black uppercase">{u.name}</p>
                                       <p className="text-[10px] font-bold text-slate-400">{u.email}</p>
@@ -226,7 +234,10 @@ const Settings: React.FC = () => {
                                 <p className="text-xs font-bold text-slate-500 uppercase">{u.storeId}</p>
                              </td>
                              <td className="px-10 py-6 text-right">
-                                <button onClick={() => deleteUser(u.id)} className="size-10 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all"><span className="material-symbols-outlined">delete</span></button>
+                                <div className="flex justify-end gap-2">
+                                   <button onClick={() => handleEditUser(u)} className="size-10 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm"><span className="material-symbols-outlined">edit</span></button>
+                                   <button onClick={() => deleteUser(u.id)} className="size-10 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
+                                </div>
                              </td>
                           </tr>
                        ))}
@@ -240,19 +251,22 @@ const Settings: React.FC = () => {
            <div className="space-y-6 animate-in slide-in-from-top-4">
               <div className="flex justify-between items-center">
                  <h3 className="text-xl font-black uppercase tracking-tight">Unidades de Negócio</h3>
-                 <button onClick={() => setShowStoreModal(true)} className="flex items-center gap-3 bg-emerald-500 text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">
+                 <button onClick={() => { setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true }); setShowStoreModal(true); }} className="flex items-center gap-3 bg-emerald-500 text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">
                     <span className="material-symbols-outlined">add_business</span> Nova Filial
                  </button>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  {establishments.map(e => (
-                    <div key={e.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-primary transition-all">
+                    <div key={e.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-primary transition-all relative">
                        <div className="flex justify-between items-start mb-6">
                           <div className="size-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all">
                              <span className="material-symbols-outlined text-3xl">store</span>
                           </div>
-                          <button onClick={() => deleteEstablishment(e.id)} className="text-slate-300 hover:text-rose-500 transition-colors"><span className="material-symbols-outlined">delete</span></button>
+                          <div className="flex gap-1">
+                             <button onClick={() => handleEditStore(e)} className="size-10 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">edit</span></button>
+                             <button onClick={() => deleteEstablishment(e.id)} className="size-10 bg-rose-500/5 text-rose-300 hover:text-rose-500 rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
+                          </div>
                        </div>
                        <h4 className="text-lg font-black uppercase mb-1">{e.name}</h4>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">{e.cnpj || 'Sem CNPJ'}</p>
@@ -310,7 +324,7 @@ const Settings: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary text-white">
-                 <h3 className="text-2xl font-black uppercase tracking-tight">Novo Acesso</h3>
+                 <h3 className="text-2xl font-black uppercase tracking-tight">{userForm.id ? 'Editar Acesso' : 'Novo Acesso'}</h3>
                  <button onClick={() => setShowUserModal(false)} className="material-symbols-outlined">close</button>
               </div>
               <form onSubmit={handleSaveUser} className="p-10 space-y-6">
@@ -344,7 +358,9 @@ const Settings: React.FC = () => {
                        />
                     </div>
                  </div>
-                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">Liberar Acesso Instantâneo</button>
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
+                    {userForm.id ? 'Salvar Alterações' : 'Liberar Acesso Instantâneo'}
+                 </button>
               </form>
            </div>
         </div>
@@ -354,7 +370,7 @@ const Settings: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-emerald-500 text-white">
-                 <h3 className="text-2xl font-black uppercase tracking-tight">Nova Unidade</h3>
+                 <h3 className="text-2xl font-black uppercase tracking-tight">{storeForm.id ? 'Editar Filial' : 'Nova Filial'}</h3>
                  <button onClick={() => setShowStoreModal(false)} className="material-symbols-outlined">close</button>
               </div>
               <form onSubmit={handleSaveStore} className="p-10 space-y-6">
@@ -370,7 +386,9 @@ const Settings: React.FC = () => {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Localização / Cidade</label>
                     <input required value={storeForm.location} onChange={e => setStoreForm({...storeForm, location: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-emerald-500" placeholder="São Paulo - SP" />
                  </div>
-                 <button type="submit" className="w-full h-16 bg-emerald-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] transition-all">Cadastrar Filial</button>
+                 <button type="submit" className="w-full h-16 bg-emerald-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] transition-all">
+                    {storeForm.id ? 'Salvar Alterações' : 'Cadastrar Filial'}
+                 </button>
               </form>
            </div>
         </div>

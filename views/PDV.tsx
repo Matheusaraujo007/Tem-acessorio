@@ -50,7 +50,8 @@ const PDV: React.FC = () => {
     });
   }, [search, category, products]);
 
-  const vendors = useMemo(() => users.filter(u => u.role === UserRole.VENDOR || u.role === UserRole.ADMIN), [users]);
+  // AJUSTE: Apenas usuários com role VENDOR aparecem aqui
+  const vendors = useMemo(() => users.filter(u => u.role === UserRole.VENDOR), [users]);
 
   const addToCart = (product: Product) => {
     if (product.stock === 0) {
@@ -140,7 +141,6 @@ const PDV: React.FC = () => {
     return today.getDate() === day && (today.getMonth() + 1) === month;
   }, [selectedCustomerId, customers]);
 
-  // Efeito para disparar o alerta de aniversário piscante por 5 segundos
   useEffect(() => {
     if (isBirthday && selectedCustomerId) {
       setShowBirthdayAlert(true);
@@ -153,7 +153,6 @@ const PDV: React.FC = () => {
     }
   }, [isBirthday, selectedCustomerId]);
 
-  // Atalhos de teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F10') { e.preventDefault(); if (cart.length > 0) setShowCheckout(true); }
@@ -174,7 +173,6 @@ const PDV: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-sans">
-      {/* ALERTA DE ANIVERSÁRIO PISCANTE (5 SEGUNDOS) */}
       {showBirthdayAlert && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none animate-in fade-in zoom-in duration-500">
            <div className="bg-white dark:bg-slate-900 px-12 py-10 rounded-[4rem] shadow-[0_0_100px_rgba(244,63,94,0.4)] border-8 border-rose-500 flex flex-col items-center gap-6 animate-pulse">
@@ -191,7 +189,6 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* HEADER PREMIUM */}
       <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 z-30 shadow-sm">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
@@ -242,7 +239,6 @@ const PDV: React.FC = () => {
       </header>
 
       <main className="flex flex-1 overflow-hidden">
-        {/* LADO ESQUERDO: CATÁLOGO */}
         <section className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900/50">
           <div className="p-6 space-y-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
             <div className="relative group">
@@ -302,9 +298,7 @@ const PDV: React.FC = () => {
           </div>
         </section>
 
-        {/* LADO DIREITO: CARRINHO E CLIENTE */}
         <aside className="w-[450px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl z-20">
-          {/* PAINEL DO CLIENTE */}
           <div className="p-6 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800">
              <div className="flex justify-between items-center mb-4">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identificação do Cliente</span>
@@ -340,7 +334,6 @@ const PDV: React.FC = () => {
              </div>
           </div>
 
-          {/* LISTA DE ITENS */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
              {cart.length > 0 ? cart.map(item => (
                <div key={item.id} className="group flex items-center gap-4 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-3xl border-2 border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
@@ -374,7 +367,6 @@ const PDV: React.FC = () => {
              )}
           </div>
 
-          {/* TOTAL E FINALIZAÇÃO */}
           <div className="p-8 bg-slate-100 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 space-y-6">
              <div className="space-y-3">
                 <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
@@ -405,7 +397,6 @@ const PDV: React.FC = () => {
         </aside>
       </main>
 
-      {/* MODAL CONSULTAR PREÇO (F4) */}
       {showPriceCheck && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/95 backdrop-blur-xl p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -497,7 +488,6 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL CADASTRO CLIENTE */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -540,7 +530,6 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL PAGAMENTO */}
       {showCheckout && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[700px] animate-in zoom-in-95">
@@ -627,7 +616,6 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL SUCESSO */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3.5rem] p-12 text-center shadow-2xl animate-in zoom-in-95">
