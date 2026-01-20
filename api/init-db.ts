@@ -9,7 +9,7 @@ export default async function handler(req: any, res: any) {
   const sql = neon(process.env.DATABASE_URL);
 
   try {
-    // Tabela de Configurações Globais (Adicionando LOGO)
+    // Tabela de Configurações Globais
     await sql`
       CREATE TABLE IF NOT EXISTS system_configs (
         id TEXT PRIMARY KEY,
@@ -20,14 +20,14 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    // Garantir que existe uma config inicial
+    // Reset/Update da config principal
     await sql`
       INSERT INTO system_configs (id, company_name)
-      VALUES ('main', 'ERP Retail - Tem Acessório')
+      VALUES ('main', 'ERP Retail')
       ON CONFLICT (id) DO NOTHING
     `;
 
-    // Tabela de Usuários (Garantindo Senha e StoreID)
+    // Tabela de Usuários
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -41,20 +41,20 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    // Criar Admin Inicial caso não exista (Para conseguir logar pela primeira vez)
+    // Admin Inicial
     await sql`
       INSERT INTO users (id, name, email, password, role, store_id, active)
       VALUES ('admin-01', 'Administrador', 'admin@erp.com', 'admin123', 'ADMINISTRADOR', 'matriz', TRUE)
       ON CONFLICT (id) DO NOTHING
     `;
 
-    // Outras tabelas permanecem...
+    // Demais tabelas
     await sql`CREATE TABLE IF NOT EXISTS establishments (id TEXT PRIMARY KEY, name TEXT NOT NULL, cnpj TEXT, location TEXT, has_stock_access BOOLEAN DEFAULT TRUE, active BOOLEAN DEFAULT TRUE)`;
     await sql`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT UNIQUE, barcode TEXT, category TEXT, cost_price NUMERIC, sale_price NUMERIC, stock INTEGER, image TEXT, brand TEXT, unit TEXT, location TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, date TEXT, due_date TEXT, description TEXT, store TEXT, category TEXT, status TEXT, value NUMERIC, type TEXT, method TEXT, client TEXT, client_id TEXT, vendor_id TEXT, items JSONB, installments INTEGER, auth_number TEXT, transaction_sku TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, birth_date TEXT)`;
 
-    return res.status(200).json({ message: 'Sistema pronto! Admin: admin@erp.com / Senha: admin123' });
+    return res.status(200).json({ message: 'Banco Neon Sincronizado!' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

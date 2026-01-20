@@ -83,7 +83,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setUsers(uRes);
       setEstablishments(eRes);
       
-      if (confRes) {
+      if (confRes && Object.keys(confRes).length > 0) {
         setSystemConfig({
           companyName: confRes.company_name || 'ERP Retail',
           logoUrl: confRes.logo_url || '',
@@ -116,8 +116,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateConfig = async (config: SystemConfig) => {
-    // 1. Atualização otimista IMEDIATA para a UI não travar
-    setSystemConfig(prev => ({ ...prev, ...config }));
+    // 1. ATUALIZAÇÃO OTIMISTA: Muda na UI instantaneamente
+    setSystemConfig(config);
     
     try {
       const response = await fetch('/api/config', {
@@ -126,13 +126,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         body: JSON.stringify(config)
       });
       
-      if (!response.ok) throw new Error("Erro ao salvar no servidor");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Erro ao salvar no servidor");
+      }
       
-      // 2. Re-sincroniza para garantir consistência
+      // 2. Sincroniza os dados finais do banco
       await refreshData();
     } catch (error) {
       console.error("Falha ao salvar configuração:", error);
-      alert("Erro ao conectar com o banco Neon. Verifique se as tabelas foram criadas em Config > Infraestrutura.");
+      alert("Ocorreu um problema ao salvar no banco de dados, mas a alteração visual foi aplicada temporariamente.");
     }
   };
 
