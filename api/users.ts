@@ -11,6 +11,7 @@ export default async function handler(req: any, res: any) {
       id: u.id,
       name: u.name,
       email: u.email,
+      password: u.password, // Adicionado para permitir login
       role: u.role,
       storeId: u.store_id,
       active: u.active,
@@ -28,6 +29,7 @@ export default async function handler(req: any, res: any) {
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
           email = EXCLUDED.email,
+          password = EXCLUDED.password,
           role = EXCLUDED.role,
           active = EXCLUDED.active,
           avatar = EXCLUDED.avatar
