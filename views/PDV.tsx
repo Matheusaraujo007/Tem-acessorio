@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../AppContext';
-import { CartItem, Product, Customer, UserRole } from '../types';
+import { CartItem, Product, Customer, UserRole, User } from '../types';
 
 const PDV: React.FC = () => {
-  const { products, customers, users, currentUser, processSale, addCustomer, establishments } = useApp();
+  const { products, customers, users, currentUser, processSale, addCustomer, updateSelf, establishments } = useApp();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Todos');
@@ -13,6 +13,7 @@ const PDV: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showPriceCheck, setShowPriceCheck] = useState(false);
   const [showBirthdayAlert, setShowBirthdayAlert] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   
   const [paymentMethod, setPaymentMethod] = useState('Cartão de Débito');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -20,6 +21,13 @@ const PDV: React.FC = () => {
 
   const [priceCheckSearch, setPriceCheckSearch] = useState('');
   const [consultedProduct, setConsultedProduct] = useState<Product | null>(null);
+
+  const [profileForm, setProfileForm] = useState({
+    name: currentUser?.name || '',
+    password: '',
+    confirmPassword: '',
+    avatar: currentUser?.avatar || ''
+  });
 
   const [cardDetails, setCardDetails] = useState({
     installments: 1,
@@ -36,6 +44,7 @@ const PDV: React.FC = () => {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const priceCheckInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const currentStore = useMemo(() => 
     establishments.find(e => e.id === currentUser?.storeId) || { name: 'Terminal Local' }, 
@@ -106,6 +115,37 @@ const PDV: React.FC = () => {
     setShowSuccessModal(true);
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
+      alert("As senhas não coincidem!");
+      return;
+    }
+    if (!currentUser) return;
+
+    const updatedUser: User = {
+      ...currentUser,
+      name: profileForm.name,
+      avatar: profileForm.avatar,
+      password: profileForm.password || currentUser.password
+    };
+
+    await updateSelf(updatedUser);
+    setShowProfileModal(false);
+    alert("Perfil atualizado com sucesso!");
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileForm({ ...profileForm, avatar: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const closeSuccessAndReset = () => {
     setCart([]);
     setSelectedCustomerId('');
@@ -172,6 +212,7 @@ const PDV: React.FC = () => {
         setConsultedProduct(null);
         setShowCheckout(false);
         setShowCustomerModal(false);
+        setShowProfileModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -197,9 +238,18 @@ const PDV: React.FC = () => {
       <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 z-30 shadow-sm">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
-             <div className="bg-primary p-2 rounded-xl text-white shadow-lg shadow-primary/30">
-                <span className="material-symbols-outlined text-2xl">rocket_launch</span>
-             </div>
+             <button onClick={() => { setProfileForm({ name: currentUser?.name || '', password: '', confirmPassword: '', avatar: currentUser?.avatar || '' }); setShowProfileModal(true); }} className="relative group overflow-hidden">
+                <div className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30 border-2 border-transparent group-hover:border-white transition-all overflow-hidden">
+                   {currentUser?.avatar ? (
+                     <img src={currentUser.avatar} className="size-full object-cover" alt="User Avatar" />
+                   ) : (
+                     <span className="material-symbols-outlined text-2xl">person</span>
+                   )}
+                </div>
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                   <span className="material-symbols-outlined text-white text-xs">edit</span>
+                </div>
+             </button>
              <div>
                 <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase">{currentStore.name}</h1>
                 <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Operador: {currentUser?.name}</p>
@@ -371,6 +421,58 @@ const PDV: React.FC = () => {
           </div>
         </aside>
       </main>
+
+      {/* MODAL PERFIL DO USUÁRIO */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary text-white">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">Meu Perfil</h3>
+                 <button onClick={() => setShowProfileModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleUpdateProfile} className="p-10 space-y-8">
+                 <div className="flex flex-col items-center gap-4">
+                    <div className="relative group size-32 rounded-3xl bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center overflow-hidden">
+                       {profileForm.avatar ? (
+                         <img src={profileForm.avatar} className="size-full object-cover" alt="Avatar Preview" />
+                       ) : (
+                         <span className="material-symbols-outlined text-4xl text-slate-300">image</span>
+                       )}
+                       <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                       <button type="button" onClick={() => avatarInputRef.current?.click()} className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+                          <span className="material-symbols-outlined">add_a_photo</span>
+                          <span className="text-[10px] font-black uppercase mt-1">Trocar Foto</span>
+                       </button>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Clique na imagem para alterar sua foto de perfil</p>
+                 </div>
+
+                 <div className="space-y-4">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4">Nome de Exibição</label>
+                       <input required value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold focus:ring-2 focus:ring-primary" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest px-4">Nova Senha</label>
+                          <input type="password" value={profileForm.password} onChange={e => setProfileForm({...profileForm, password: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-sm font-bold focus:ring-2 focus:ring-rose-500" placeholder="••••••" />
+                       </div>
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest px-4">Confirmar</label>
+                          <input type="password" value={profileForm.confirmPassword} onChange={e => setProfileForm({...profileForm, confirmPassword: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-sm font-bold focus:ring-2 focus:ring-rose-500" placeholder="••••••" />
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="flex gap-4">
+                    <button type="button" onClick={() => setShowProfileModal(false)} className="flex-1 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest">Descartar</button>
+                    <button type="submit" className="flex-[2] h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20">Salvar Alterações</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
 
       {/* MODAL CONSULTA DE PREÇO */}
       {showPriceCheck && (

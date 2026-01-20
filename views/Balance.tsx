@@ -141,13 +141,15 @@ const Balance: React.FC = () => {
     // Soma lotes gravados
     batches.forEach(b => {
       Object.entries(b.items).forEach(([pid, qty]) => {
-        total[pid] = (total[pid] || 0) + qty;
+        // Fix for Error: Operator '+' cannot be applied to types 'number' and 'unknown'.
+        total[pid] = (total[pid] || 0) + (qty as number);
       });
     });
 
     // Soma lote que está sendo bipado agora
     Object.entries(currentBatchItems).forEach(([pid, qty]) => {
-      total[pid] = (total[pid] || 0) + qty;
+      // Fix for Error: Operator '+' cannot be applied to types 'number' and 'unknown'.
+      total[pid] = (total[pid] || 0) + (qty as number);
     });
 
     return total;
@@ -170,7 +172,8 @@ const Balance: React.FC = () => {
   }, [products, consolidatedCount]);
 
   const stats = useMemo(() => {
-    const totalCounted = Object.values(consolidatedCount).reduce((a, b) => a + b, 0);
+    // Fix for Error: Operator '+' cannot be applied to types 'unknown' and 'unknown'.
+    const totalCounted = (Object.values(consolidatedCount) as number[]).reduce((a, b) => a + b, 0);
     const divergencies = comparison.filter(c => c.diff !== 0).length;
     return { totalCounted, divergencies };
   }, [consolidatedCount, comparison]);
@@ -363,7 +366,8 @@ const Balance: React.FC = () => {
                             <span className="material-symbols-outlined text-xs text-primary opacity-0 group-hover/batch:opacity-100 transition-opacity">visibility</span>
                          </div>
                          <p className="text-[10px] font-bold text-primary uppercase">
-                           {Object.values(b.items).reduce((a,b) => a+b, 0)} itens • {b.timestamp}
+                           {/* Fix for Error: Operator '+' cannot be applied to types 'unknown' and 'unknown'. */}
+                           {(Object.values(b.items) as number[]).reduce((a,b) => a+b, 0)} itens • {b.timestamp}
                          </p>
                       </div>
                       <button 

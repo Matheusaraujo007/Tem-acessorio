@@ -29,6 +29,7 @@ interface AppContextType {
   addTransaction: (t: Transaction) => Promise<void>;
   addCustomer: (c: Customer) => Promise<void>;
   addUser: (u: User) => Promise<void>;
+  updateSelf: (u: User) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   transferUser: (userId: string, newStoreId: string) => Promise<void>;
   addEstablishment: (e: Establishment) => Promise<void>;
@@ -165,7 +166,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
-  const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
+  const addUser = async (u: User) => { 
+    await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); 
+    await refreshData(); 
+  };
+  const updateSelf = async (u: User) => {
+    await addUser(u);
+    setCurrentUser(u);
+  };
   const deleteUser = async (id: string) => { await fetch(`/api/users?id=${id}`, { method: 'DELETE' }); await refreshData(); };
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
   const deleteEstablishment = async (id: string) => { await fetch(`/api/establishments?id=${id}`, { method: 'DELETE' }); await refreshData(); };
@@ -201,7 +209,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <AppContext.Provider value={{ 
       currentUser, systemConfig, rolePermissions, products, transactions, customers, users, establishments, loading, login, logout, updateConfig, updateRolePermissions,
-      addProduct, updateProduct: addProduct, deleteProduct: (id) => deleteUser(id), addTransaction, addCustomer, addUser, deleteUser, transferUser, addEstablishment, deleteEstablishment, processSale, updateStock, bulkUpdateStock, refreshData
+      addProduct, updateProduct: addProduct, deleteProduct: (id) => deleteUser(id), addTransaction, addCustomer, addUser, updateSelf, deleteUser, transferUser, addEstablishment, deleteEstablishment, processSale, updateStock, bulkUpdateStock, refreshData
     }}>
       {children}
     </AppContext.Provider>
