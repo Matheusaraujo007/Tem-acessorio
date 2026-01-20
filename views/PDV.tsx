@@ -52,7 +52,6 @@ const PDV: React.FC = () => {
     });
   }, [search, category, products]);
 
-  // RESTRIÇÃO POR UNIDADE: Apenas vendedores da mesma loja do usuário logado
   const vendors = useMemo(() => {
     return users.filter(u => u.role === UserRole.VENDOR && u.storeId === currentUser?.storeId);
   }, [users, currentUser]);
@@ -124,9 +123,13 @@ const PDV: React.FC = () => {
     setNewCustomerForm({ name: '', email: '', phone: '', birthDate: '' });
   };
 
-  const handlePriceCheck = (e: React.KeyboardEvent) => {
+  const handlePriceCheckInput = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && priceCheckSearch) {
-      const found = products.find(p => p.barcode === priceCheckSearch || p.sku === priceCheckSearch || p.name.toLowerCase().includes(priceCheckSearch.toLowerCase()));
+      const found = products.find(p => 
+        p.barcode === priceCheckSearch || 
+        p.sku === priceCheckSearch || 
+        p.name.toLowerCase().includes(priceCheckSearch.toLowerCase())
+      );
       if (found) {
         setConsultedProduct(found);
       } else {
@@ -167,6 +170,8 @@ const PDV: React.FC = () => {
       if (e.key === 'Escape') {
         setShowPriceCheck(false);
         setConsultedProduct(null);
+        setShowCheckout(false);
+        setShowCustomerModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -180,8 +185,6 @@ const PDV: React.FC = () => {
            <div className="bg-white dark:bg-slate-900 px-12 py-10 rounded-[4rem] shadow-[0_0_100px_rgba(244,63,94,0.4)] border-8 border-rose-500 flex flex-col items-center gap-6 animate-pulse">
               <div className="relative">
                 <span className="material-symbols-outlined text-[120px] text-rose-500 animate-bounce">cake</span>
-                <span className="material-symbols-outlined absolute -top-4 -right-4 text-4xl text-amber-500 animate-ping">auto_awesome</span>
-                <span className="material-symbols-outlined absolute -bottom-2 -left-6 text-5xl text-blue-500 animate-ping" style={{ animationDelay: '200ms' }}>celebration</span>
               </div>
               <div className="text-center">
                  <h2 className="text-5xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none mb-2">Parabéns!</h2>
@@ -199,7 +202,7 @@ const PDV: React.FC = () => {
              </div>
              <div>
                 <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase">{currentStore.name}</h1>
-                <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">PDV Logado: {currentUser?.name}</p>
+                <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Operador: {currentUser?.name}</p>
              </div>
           </div>
           
@@ -273,9 +276,6 @@ const PDV: React.FC = () => {
                  >
                     <div className="relative aspect-square bg-slate-100 dark:bg-slate-900 rounded-[1.5rem] overflow-hidden mb-4 shadow-inner">
                       <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.name} />
-                      <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                         <span className="bg-white text-primary p-3 rounded-full shadow-xl"><span className="material-symbols-outlined">add_shopping_cart</span></span>
-                      </div>
                     </div>
                     <div className="flex-1 flex flex-col">
                        <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 line-clamp-2 leading-tight mb-2 uppercase">{product.name}</h4>
@@ -284,9 +284,6 @@ const PDV: React.FC = () => {
                           <span className="text-lg font-black text-primary tabular-nums">R$ {product.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                        </div>
                     </div>
-                    {product.stock <= 5 && product.stock > 0 && (
-                      <div className="absolute top-6 left-6 bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded shadow-lg uppercase">Últimas {product.stock} un.</div>
-                    )}
                  </div>
                ))}
             </div>
@@ -314,14 +311,6 @@ const PDV: React.FC = () => {
                    </select>
                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
                 </div>
-
-                {isBirthday && (
-                   <div className="relative group">
-                      <div className="size-14 bg-gradient-to-tr from-rose-500 to-orange-400 text-white rounded-2xl flex items-center justify-center animate-bounce shadow-lg shadow-rose-500/30 border-2 border-white dark:border-slate-700">
-                         <span className="material-symbols-outlined text-3xl">cake</span>
-                      </div>
-                   </div>
-                )}
              </div>
           </div>
 
@@ -361,10 +350,6 @@ const PDV: React.FC = () => {
           <div className="p-8 bg-slate-100 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 space-y-6">
              <div className="space-y-3">
                 <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                   <span>Itens</span>
-                   <span>{cart.reduce((a, b) => a + b.quantity, 0)} un.</span>
-                </div>
-                <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
                    <span>Subtotal</span>
                    <span>R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
@@ -381,14 +366,186 @@ const PDV: React.FC = () => {
                 onClick={() => setShowCheckout(true)}
                 className="w-full py-6 bg-primary hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white rounded-[2rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 group"
              >
-                <span className="material-symbols-outlined text-3xl group-hover:scale-125 transition-transform">credit_card</span>
                 FECHAR VENDA (F10)
              </button>
           </div>
         </aside>
       </main>
 
-      {/* Outros Modais (PriceCheck, CustomerModal, Checkout, etc.) permanecem funcionais */}
+      {/* MODAL CONSULTA DE PREÇO */}
+      {showPriceCheck && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">Consulta de Preço</h3>
+                 <button onClick={() => { setShowPriceCheck(false); setConsultedProduct(null); }} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-10 space-y-8 text-center">
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Escaneie o código ou digite o SKU</p>
+                    <input 
+                      ref={priceCheckInputRef}
+                      value={priceCheckSearch}
+                      onChange={e => setPriceCheckSearch(e.target.value)}
+                      onKeyDown={handlePriceCheckInput}
+                      className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] px-8 text-3xl font-black text-center text-primary placeholder:text-slate-200"
+                      placeholder="0000000000000"
+                    />
+                 </div>
+
+                 {consultedProduct ? (
+                   <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="size-48 bg-slate-50 dark:bg-slate-800 rounded-[2.5rem] mx-auto mb-6 p-4 border border-slate-100 dark:border-slate-700">
+                         <img src={consultedProduct.image} className="size-full object-cover rounded-2xl" />
+                      </div>
+                      <h4 className="text-2xl font-black text-slate-800 dark:text-white uppercase mb-2">{consultedProduct.name}</h4>
+                      <div className="flex justify-center gap-8 mb-4">
+                         <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estoque</p>
+                            <p className="text-xl font-black text-slate-800 dark:text-white">{consultedProduct.stock} un.</p>
+                         </div>
+                         <div className="w-px h-10 bg-slate-200 dark:bg-slate-700"></div>
+                         <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU</p>
+                            <p className="text-xl font-black text-slate-800 dark:text-white uppercase">{consultedProduct.sku}</p>
+                         </div>
+                      </div>
+                      <div className="bg-primary/5 p-8 rounded-[2rem] border-2 border-primary/20 inline-block px-16">
+                         <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Preço de Venda</p>
+                         <h5 className="text-5xl font-black text-primary tabular-nums">R$ {consultedProduct.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h5>
+                      </div>
+                   </div>
+                 ) : (
+                   <div className="py-20 opacity-20">
+                      <span className="material-symbols-outlined text-8xl">barcode_scanner</span>
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CHECKOUT */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary text-white">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">Finalização da Venda</h3>
+                 <button onClick={() => setShowCheckout(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+                 <div className="space-y-6">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4">Meio de Pagamento</label>
+                       <select 
+                         value={paymentMethod}
+                         onChange={e => setPaymentMethod(e.target.value)}
+                         className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-black uppercase outline-none focus:ring-2 focus:ring-primary transition-all"
+                       >
+                          <option value="Cartão de Débito">Cartão de Débito</option>
+                          <option value="Cartão de Crédito">Cartão de Crédito</option>
+                          <option value="Dinheiro">Dinheiro</option>
+                          <option value="PIX">Transferência Instantânea (PIX)</option>
+                       </select>
+                    </div>
+
+                    {paymentMethod.includes('Cartão') && (
+                       <div className="space-y-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700">
+                          <div className="space-y-1.5">
+                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Parcelas</label>
+                             <select 
+                                value={cardDetails.installments}
+                                onChange={e => setCardDetails({...cardDetails, installments: parseInt(e.target.value)})}
+                                className="w-full bg-transparent border-none p-0 text-sm font-black outline-none focus:ring-0"
+                             >
+                                {[1,2,3,4,5,6,10,12].map(n => <option key={n} value={n}>{n}x sem juros</option>)}
+                             </select>
+                          </div>
+                          <div className="space-y-1.5">
+                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cód. Autorização / NSU</label>
+                             <input 
+                                value={cardDetails.authNumber}
+                                onChange={e => setCardDetails({...cardDetails, authNumber: e.target.value})}
+                                placeholder="000000"
+                                className="w-full bg-transparent border-none p-0 text-sm font-black outline-none focus:ring-0"
+                             />
+                          </div>
+                       </div>
+                    )}
+                 </div>
+
+                 <div className="flex flex-col justify-between bg-slate-900 text-white p-10 rounded-[2.5rem] shadow-2xl">
+                    <div className="space-y-4">
+                       <p className="text-[10px] font-black text-primary uppercase tracking-widest">Total a Pagar</p>
+                       <h4 className="text-6xl font-black tabular-nums tracking-tighter text-white">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+                    </div>
+                    
+                    <button 
+                       onClick={handleFinalizeSale}
+                       className="w-full h-20 bg-primary hover:bg-blue-600 text-white rounded-3xl font-black text-lg uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+                    >
+                       Confirmar Recebimento
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CADASTRO CLIENTE RAPIDO */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary text-white">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">Novo Cliente</h3>
+                 <button onClick={() => setShowCustomerModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleCreateCustomer} className="p-10 space-y-6">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Nome Completo</label>
+                    <input required value={newCustomerForm.name} onChange={e => setNewCustomerForm({...newCustomerForm, name: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary" />
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Telefone / WhatsApp</label>
+                       <input value={newCustomerForm.phone} onChange={e => setNewCustomerForm({...newCustomerForm, phone: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary" placeholder="(00) 00000-0000" />
+                    </div>
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Aniversário</label>
+                       <input type="date" value={newCustomerForm.birthDate} onChange={e => setNewCustomerForm({...newCustomerForm, birthDate: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary" />
+                    </div>
+                 </div>
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl mt-4">Salvar e Selecionar</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL SUCESSO */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[3rem] shadow-2xl p-12 text-center animate-in zoom-in-95">
+              <div className="size-24 bg-emerald-500 text-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-emerald-500/30">
+                 <span className="material-symbols-outlined text-5xl">check_circle</span>
+              </div>
+              <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase mb-2">Venda Concluída</h3>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mb-10">O cupom fiscal foi gerado e o estoque atualizado com sucesso.</p>
+              
+              <div className="space-y-3">
+                 <button onClick={closeSuccessAndReset} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Nova Venda</button>
+                 <button className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-sm">print</span> Imprimir Cupom
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      `}</style>
     </div>
   );
 };

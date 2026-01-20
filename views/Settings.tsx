@@ -19,8 +19,10 @@ const Settings: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
   
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+
   const [userForm, setUserForm] = useState<Partial<User>>({
-    name: '', email: '', password: '', role: UserRole.VENDOR, storeId: '', active: true
+    name: '', email: '', password: '', role: UserRole.VENDOR, storeId: currentUser?.storeId || '', active: true
   });
   
   const [storeForm, setStoreForm] = useState<Partial<Establishment>>({
@@ -30,6 +32,12 @@ const Settings: React.FC = () => {
   useEffect(() => {
     setLocalConfig(systemConfig);
   }, [systemConfig]);
+
+  // Filtro de Usuários: Se não for ADMIN, vê apenas quem é da sua unidade
+  const filteredUsers = users.filter(u => isAdmin || u.storeId === currentUser?.storeId);
+  
+  // Filtro de Lojas: Se não for ADMIN, vê apenas a sua própria unidade
+  const filteredStores = establishments.filter(e => isAdmin || e.id === currentUser?.storeId);
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
@@ -68,7 +76,7 @@ const Settings: React.FC = () => {
     };
     await addUser(newUser);
     setShowUserModal(false);
-    setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: '', active: true });
+    setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: currentUser?.storeId || '', active: true });
   };
 
   const handleEditStore = (e: Establishment) => {
@@ -103,16 +111,16 @@ const Settings: React.FC = () => {
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Gestão do Sistema</h1>
-        <p className="text-slate-500 text-sm font-medium">Configure a identidade visual, equipe, permissões e infraestrutura.</p>
+        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Gestão Administrativa</h1>
+        <p className="text-slate-500 text-sm font-medium uppercase tracking-tight">Configure a equipe e visual da unidade logada.</p>
       </div>
 
       <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar gap-2">
         <TabButton active={activeTab === 'general'} onClick={() => setActiveTab('general')} icon="palette" label="Identidade" />
         <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon="badge" label="Colaboradores" />
-        <TabButton active={activeTab === 'stores'} onClick={() => setActiveTab('stores')} icon="store" label="Filiais" />
-        <TabButton active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')} icon="shield_person" label="Permissões" />
-        <TabButton active={activeTab === 'db'} onClick={() => setActiveTab('db')} icon="settings_ethernet" label="Infraestrutura" />
+        <TabButton active={activeTab === 'stores'} onClick={() => setActiveTab('stores')} icon="store" label="Unidades" />
+        {isAdmin && <TabButton active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')} icon="shield_person" label="Permissões" />}
+        {isAdmin && <TabButton active={activeTab === 'db'} onClick={() => setActiveTab('db')} icon="settings_ethernet" label="Infraestrutura" />}
       </div>
 
       <div className="mt-6">
@@ -141,27 +149,29 @@ const Settings: React.FC = () => {
                    </div>
                    <div className="space-y-4">
                       <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-500 uppercase px-4 tracking-widest">Nome do ERP / Empresa</label>
+                         <label className="text-[10px] font-black text-slate-500 uppercase px-4 tracking-widest">Nome da Empresa</label>
                          <input 
                             type="text" 
+                            disabled={!isAdmin}
                             value={localConfig.companyName}
                             onChange={e => setLocalConfig({...localConfig, companyName: e.target.value})}
-                            className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] px-6 text-sm font-black border-none outline-none focus:ring-2 focus:ring-primary transition-all" 
+                            className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] px-6 text-sm font-black border-none outline-none focus:ring-2 focus:ring-primary transition-all disabled:opacity-50" 
                          />
                       </div>
                    </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
-                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Regras de Negócio</h4>
+                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Regras Operacionais</h4>
                    <div className="space-y-4">
                       <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem]">
                          <div className="flex flex-col gap-1">
                             <p className="text-xs font-black text-slate-700 dark:text-white uppercase">Venda com Estoque Zero</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Permite finalizar vendas sem saldo.</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Permite vendas sem saldo.</p>
                          </div>
                          <label className="relative inline-flex items-center cursor-pointer">
                            <input 
                             type="checkbox" 
+                            disabled={!isAdmin}
                             checked={localConfig.allowNegativeStock}
                             onChange={e => setLocalConfig({...localConfig, allowNegativeStock: e.target.checked})}
                             className="sr-only peer" 
@@ -172,18 +182,22 @@ const Settings: React.FC = () => {
                    </div>
                 </div>
              </div>
-             <button onClick={handleSaveConfig} className={`w-full md:w-auto px-16 py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl transition-all ${isSaving ? 'bg-emerald-500' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'}`}>
-               {isSaving ? 'Configuração Salva!' : 'Salvar Alterações'}
-             </button>
+             {isAdmin && (
+               <button onClick={handleSaveConfig} className={`w-full md:w-auto px-16 py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl transition-all ${isSaving ? 'bg-emerald-500' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'}`}>
+                 {isSaving ? 'Configuração Salva!' : 'Salvar Identidade Global'}
+               </button>
+             )}
           </div>
         )}
 
         {activeTab === 'users' && (
            <div className="space-y-6 animate-in slide-in-from-top-4">
               <div className="flex justify-between items-center">
-                 <h3 className="text-xl font-black uppercase tracking-tight">Equipe Cadastrada</h3>
-                 <button onClick={() => { setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: '', active: true }); setShowUserModal(true); }} className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
-                    <span className="material-symbols-outlined">person_add</span> Novo Usuário
+                 <h3 className="text-xl font-black uppercase tracking-tight">
+                    Equipe {isAdmin ? 'Global' : 'da Unidade'}
+                 </h3>
+                 <button onClick={() => { setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: currentUser?.storeId || '', active: true }); setShowUserModal(true); }} className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+                    <span className="material-symbols-outlined">person_add</span> Novo Acesso
                  </button>
               </div>
               
@@ -198,7 +212,7 @@ const Settings: React.FC = () => {
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                       {users.map(u => (
+                       {filteredUsers.map(u => (
                           <tr key={u.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all">
                              <td className="px-10 py-6">
                                 <div className="flex items-center gap-4">
@@ -214,13 +228,13 @@ const Settings: React.FC = () => {
                              </td>
                              <td className="px-10 py-6">
                                 <p className="text-xs font-bold text-slate-500 uppercase">
-                                   {establishments.find(e => e.id === u.storeId)?.name || 'UNIDADE NÃO ENCONTRADA'}
+                                   {establishments.find(e => e.id === u.storeId)?.name || 'LOCAL'}
                                 </p>
                              </td>
                              <td className="px-10 py-6 text-right">
                                 <div className="flex justify-end gap-2">
                                    <button onClick={() => handleEditUser(u)} className="size-10 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm"><span className="material-symbols-outlined">edit</span></button>
-                                   <button onClick={() => {if(confirm('Excluir este usuário?')) deleteUser(u.id)}} className="size-10 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
+                                   {isAdmin && <button onClick={() => {if(confirm('Excluir este usuário?')) deleteUser(u.id)}} className="size-10 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>}
                                 </div>
                              </td>
                           </tr>
@@ -234,23 +248,27 @@ const Settings: React.FC = () => {
         {activeTab === 'stores' && (
            <div className="space-y-6 animate-in slide-in-from-top-4">
               <div className="flex justify-between items-center">
-                 <h3 className="text-xl font-black uppercase tracking-tight">Unidades de Negócio</h3>
-                 <button onClick={() => { setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true }); setShowStoreModal(true); }} className="flex items-center gap-3 bg-emerald-500 text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">
+                 <h3 className="text-xl font-black uppercase tracking-tight">
+                    {isAdmin ? 'Gerenciar Unidades' : 'Minha Unidade'}
+                 </h3>
+                 {isAdmin && <button onClick={() => { setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true }); setShowStoreModal(true); }} className="flex items-center gap-3 bg-emerald-500 text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">
                     <span className="material-symbols-outlined">add_business</span> Nova Filial
-                 </button>
+                 </button>}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {establishments.map(e => (
+                 {filteredStores.map(e => (
                     <div key={e.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-primary transition-all relative">
                        <div className="flex justify-between items-start mb-6">
                           <div className="size-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all">
                              <span className="material-symbols-outlined text-3xl">store</span>
                           </div>
-                          <div className="flex gap-1">
-                             <button onClick={() => handleEditStore(e)} className="size-10 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">edit</span></button>
-                             <button onClick={() => {if(confirm('Excluir esta unidade?')) deleteEstablishment(e.id)}} className="size-10 bg-rose-500/5 text-rose-300 hover:text-rose-500 rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
-                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-1">
+                               <button onClick={() => handleEditStore(e)} className="size-10 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">edit</span></button>
+                               <button onClick={() => {if(confirm('Excluir esta unidade?')) deleteEstablishment(e.id)}} className="size-10 bg-rose-500/5 text-rose-300 hover:text-rose-500 rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
+                            </div>
+                          )}
                        </div>
                        <h4 className="text-lg font-black uppercase mb-1">{e.name}</h4>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">{e.cnpj || 'Sem CNPJ'}</p>
@@ -264,7 +282,7 @@ const Settings: React.FC = () => {
            </div>
         )}
 
-        {activeTab === 'permissions' && (
+        {isAdmin && activeTab === 'permissions' && (
           <div className="space-y-8 animate-in slide-in-from-top-4">
              <div className="bg-amber-500/10 border border-amber-500/20 p-6 rounded-3xl flex items-center gap-4">
                 <span className="material-symbols-outlined text-amber-500 text-3xl">info</span>
@@ -305,13 +323,13 @@ const Settings: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'db' && (
+        {isAdmin && activeTab === 'db' && (
           <div className="bg-white dark:bg-slate-900 p-12 rounded-[3rem] border border-slate-200 dark:border-slate-800 text-center space-y-6 animate-in slide-in-from-top-4">
              <div className="size-24 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="material-symbols-outlined text-5xl">cloud_sync</span>
              </div>
              <h3 className="text-2xl font-black uppercase tracking-tight">Infraestrutura Neon Serverless</h3>
-             <p className="max-w-md mx-auto text-slate-500 font-bold text-sm uppercase leading-relaxed">Seu ERP está conectado a um banco de dados relacional de alta performance e escala automática.</p>
+             <p className="max-w-md mx-auto text-slate-500 font-bold text-sm uppercase leading-relaxed">Conectado ao banco de dados relacional Neon.</p>
              <button onClick={() => window.location.reload()} className="px-12 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all">Sincronizar Agora</button>
           </div>
         )}
@@ -337,11 +355,16 @@ const Settings: React.FC = () => {
                  
                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Unidade de Atuação</label>
-                    <select required value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary">
-                       <option value="">SELECIONE UMA UNIDADE</option>
-                       {establishments.map(est => (
-                         <option key={est.id} value={est.id}>{est.name}</option>
-                       ))}
+                    <select required disabled={!isAdmin} value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary disabled:opacity-50">
+                       {!isAdmin && <option value={currentUser?.storeId}>{establishments.find(e => e.id === currentUser?.storeId)?.name}</option>}
+                       {isAdmin && (
+                         <>
+                           <option value="">SELECIONE UMA UNIDADE</option>
+                           {establishments.map(est => (
+                             <option key={est.id} value={est.id}>{est.name}</option>
+                           ))}
+                         </>
+                       )}
                     </select>
                  </div>
 
@@ -349,7 +372,7 @@ const Settings: React.FC = () => {
                     <div className="space-y-1.5">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Cargo / Nível</label>
                        <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary">
-                          {Object.values(UserRole).map(role => <option key={role} value={role}>{role}</option>)}
+                          {Object.values(UserRole).filter(r => isAdmin || r !== UserRole.ADMIN).map(role => <option key={role} value={role}>{role}</option>)}
                        </select>
                     </div>
                     <div className="space-y-1.5">
@@ -365,7 +388,7 @@ const Settings: React.FC = () => {
       )}
 
       {/* MODAL FILIAL */}
-      {showStoreModal && (
+      {showStoreModal && isAdmin && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-emerald-500 text-white">

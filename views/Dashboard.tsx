@@ -7,50 +7,53 @@ import { UserRole } from '../types';
 const Dashboard: React.FC = () => {
   const { transactions, products, currentUser, establishments } = useApp();
   const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const currentStoreName = establishments.find(e => e.id === currentUser?.storeId)?.name || 'Principal';
+  const currentStore = establishments.find(e => e.id === currentUser?.storeId);
+  const currentStoreName = currentStore?.name || '';
 
   const today = new Date().toISOString().split('T')[0];
   
-  // RESTRIÇÃO POR UNIDADE: Filtra as transações e o estoque por loja
+  // Filtro base de transações da unidade
+  const unitTransactions = useMemo(() => {
+    return (transactions || []).filter(t => isAdmin || t.store === currentStoreName);
+  }, [transactions, isAdmin, currentStoreName]);
+
   const salesToday = useMemo(() => {
-    return (transactions || [])
-      .filter(t => t.date === today && t.type === 'INCOME' && (isAdmin || t.store === currentStoreName))
+    return unitTransactions
+      .filter(t => t.date === today && t.type === 'INCOME')
       .reduce((acc, t) => acc + t.value, 0);
-  }, [transactions, today, isAdmin, currentStoreName]);
+  }, [unitTransactions, today]);
 
   const criticalStockCount = useMemo(() => {
     return (products || []).filter(p => p.stock <= 5).length;
   }, [products]);
 
   const netProfit = useMemo(() => {
-    const incomes = (transactions || []).filter(t => t.type === 'INCOME' && (isAdmin || t.store === currentStoreName));
-    const expenses = (transactions || []).filter(t => t.type === 'EXPENSE' && (isAdmin || t.store === currentStoreName));
-    const income = incomes.reduce((acc, t) => acc + t.value, 0);
-    const expense = expenses.reduce((acc, t) => acc + t.value, 0);
+    const income = unitTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
+    const expense = unitTransactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
     return income - expense;
-  }, [transactions, isAdmin, currentStoreName]);
+  }, [unitTransactions]);
 
   const chartData = useMemo(() => {
-    return [...(transactions || [])]
-      .filter(t => t.type === 'INCOME' && (isAdmin || t.store === currentStoreName))
+    return unitTransactions
+      .filter(t => t.type === 'INCOME')
       .slice(0, 6)
       .reverse();
-  }, [transactions, isAdmin, currentStoreName]);
+  }, [unitTransactions]);
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-1">
         <h3 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
-          Performance {isAdmin ? 'Global' : `Unidade: ${currentStoreName}`}
+          {isAdmin ? 'Performance Global' : `Performance: ${currentStoreName}`}
         </h3>
-        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-tight">Painel de controle em tempo real.</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-tight">Dados em tempo real da sua unidade.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard title="Vendas Hoje" value={`R$ ${salesToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Unidade" icon="monitoring" color="#136dec" />
-        <KPICard title="Resultado" value={`R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Consolidado" icon="account_balance" color="#10b981" />
+        <KPICard title="Vendas Hoje" value={`R$ ${salesToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Hoje" icon="monitoring" color="#136dec" />
+        <KPICard title="Resultado" value={`R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Saldo" icon="account_balance" color="#10b981" />
         <KPICard title="Itens Críticos" value={`${criticalStockCount} produtos`} trend="Alerta" icon="inventory_2" color="#f59e0b" />
-        <KPICard title="Movimentações" value={`${transactions.filter(t => isAdmin || t.store === currentStoreName).length}`} trend="Unidade" icon="history" color="#8b5cf6" />
+        <KPICard title="Movimentações" value={`${unitTransactions.length}`} trend="Total" icon="history" color="#8b5cf6" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -73,7 +76,7 @@ const Dashboard: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">Aguardando Lançamentos...</div>
+                <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">Sem vendas recentes...</div>
               )}
            </div>
         </div>

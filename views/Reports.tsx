@@ -7,25 +7,25 @@ const Reports: React.FC = () => {
   const { transactions, customers, users, currentUser, establishments } = useApp();
   const [period, setPeriod] = useState(30);
 
-  const today = new Date();
-  const cutoffDate = new Date();
-  cutoffDate.setDate(today.getDate() - period);
-
   const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const currentStore = establishments.find(e => e.id === currentUser?.storeId);
+  const currentStoreName = currentStore?.name || '';
 
-  // RESTRIÇÃO POR UNIDADE: Filtra as transações pela loja do usuário (se não for Admin Global)
+  const cutoffDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - period);
+    return d;
+  }, [period]);
+
+  // Filtro rigoroso por período e unidade
   const periodSales = useMemo(() => {
-    return transactions.filter(t => {
+    return (transactions || []).filter(t => {
       const tDate = new Date(t.date);
       const isCorrectPeriod = t.type === 'INCOME' && t.category === 'Venda' && tDate >= cutoffDate;
-      const isCorrectStore = isAdmin || t.vendorId ? users.find(u => u.id === t.vendorId)?.storeId === currentUser?.storeId : true;
-      // Para vendas vindas do PDV, verificamos se a store da transação bate com a store do usuário
-      // Nota: No AppContext a transação já é gravada com a store do currentUser.
-      const belongsToStore = isAdmin || t.store === establishments.find(e => e.id === currentUser?.storeId)?.name;
-      
+      const belongsToStore = isAdmin || t.store === currentStoreName;
       return isCorrectPeriod && belongsToStore;
     });
-  }, [transactions, period, currentUser, isAdmin, establishments, users]);
+  }, [transactions, cutoffDate, isAdmin, currentStoreName]);
 
   const mostSoldItems = useMemo(() => {
     const counts: Record<string, { product: Product; qty: number; revenue: number }> = {};
@@ -39,17 +39,12 @@ const Reports: React.FC = () => {
     return Object.values(counts).sort((a, b) => b.qty - a.qty).slice(0, 5);
   }, [periodSales]);
 
-  const customersInPeriod = useMemo(() => {
-    const clientIds = new Set(periodSales.filter(t => t.clientId).map(t => t.clientId));
-    return customers.filter(c => clientIds.has(c.id));
-  }, [periodSales, customers]);
-
   const vendorPerformance = useMemo(() => {
     const stats: Record<string, { name: string; avatar?: string; totalValue: number; count: number }> = {};
     
-    // Mostra apenas vendedores da mesma unidade
+    // Mostra apenas usuários da mesma unidade
     const relevantUsers = users.filter(u => 
-      u.role === UserRole.VENDOR && (isAdmin || u.storeId === currentUser?.storeId)
+      (u.role === UserRole.VENDOR || u.role === UserRole.CASHIER) && (isAdmin || u.storeId === currentUser?.storeId)
     );
 
     relevantUsers.forEach(u => {
@@ -77,12 +72,12 @@ const Reports: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Inteligência de Vendas</h2>
-          <p className="text-slate-500 text-sm mt-1 font-bold">
-            {isAdmin ? 'Visão Consolidada Global' : `Unidade: ${establishments.find(e => e.id === currentUser?.storeId)?.name || 'Local'}`}
+          <p className="text-slate-500 text-sm mt-1 font-bold uppercase tracking-tight">
+            {isAdmin ? 'Visão Consolidada Global' : `Filtro Unidade: ${currentStoreName}`}
           </p>
         </div>
         
-        <div className="flex bg-white dark:bg-slate-800 p-1 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="flex bg-white dark:bg-slate-800 p-1 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
            {[7, 30, 90].map(d => (
              <button key={d} onClick={() => setPeriod(d)} className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${period === d ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{d} DIAS</button>
            ))}
@@ -90,21 +85,21 @@ const Reports: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <ReportKPICard title="Ticket Médio Unidade" value={`R$ ${globalAverageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="payments" color="text-primary" />
-        <ReportKPICard title="Clientes Atendidos" value={customersInPeriod.length.toString()} icon="person_check" color="text-emerald-500" />
+        <ReportKPICard title="Ticket Médio" value={`R$ ${globalAverageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="payments" color="text-primary" />
         <ReportKPICard title="Vendas Período" value={periodSales.length.toString()} icon="shopping_bag" color="text-rose-500" />
-        <ReportKPICard title="Faturamento Unidade" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="trending_up" color="text-amber-500" />
+        <ReportKPICard title="Faturamento Bruto" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="trending_up" color="text-amber-500" />
+        <ReportKPICard title="Vendedores Ativos" value={vendorPerformance.filter(v => v.count > 0).length.toString()} icon="badge" color="text-primary" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase flex items-center gap-3"><span className="material-symbols-outlined text-amber-500">trophy</span> Produtos Estrela</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase flex items-center gap-3"><span className="material-symbols-outlined text-amber-500">trophy</span> Produtos Mais Vendidos</h3>
            </div>
            <div className="space-y-4">
-              {mostSoldItems.map((item, idx) => (
+              {mostSoldItems.length > 0 ? mostSoldItems.map((item) => (
                 <div key={item.product.id} className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-3xl group">
-                   <div className="size-14 rounded-xl overflow-hidden shadow-md"><img src={item.product.image} className="w-full h-full object-cover" /></div>
+                   <div className="size-14 rounded-xl overflow-hidden shadow-md"><img src={item.product.image} className="w-full h-full object-cover" alt={item.product.name} /></div>
                    <div className="flex-1">
                       <p className="text-xs font-black text-slate-800 dark:text-white uppercase truncate">{item.product.name}</p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">{item.product.category}</p>
@@ -114,20 +109,22 @@ const Reports: React.FC = () => {
                       <p className="text-[9px] text-slate-400 font-mono">R$ {item.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                    </div>
                 </div>
-              ))}
+              )) : (
+                <div className="py-20 text-center opacity-20 uppercase font-black text-xs tracking-widest">Nenhuma venda no período</div>
+              )}
            </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase flex items-center gap-3"><span className="material-symbols-outlined text-primary">badge</span> Ranking Vendedores</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase flex items-center gap-3"><span className="material-symbols-outlined text-primary">badge</span> Desempenho da Equipe</h3>
            </div>
            <div className="space-y-6">
-              {vendorPerformance.map(vendor => (
+              {vendorPerformance.length > 0 ? vendorPerformance.map(vendor => (
                 <div key={vendor.name} className="space-y-2">
                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                         <div className="size-10 rounded-full bg-slate-200 border border-white" style={{ backgroundImage: `url(${vendor.avatar})`, backgroundSize: 'cover' }}></div>
+                         <div className="size-10 rounded-full bg-slate-200 border border-white" style={{ backgroundImage: `url(${vendor.avatar || 'https://picsum.photos/seed/user/100/100'})`, backgroundSize: 'cover' }}></div>
                          <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase">{vendor.name}</span>
                       </div>
                       <div className="text-right"><span className="text-xs font-black text-primary tabular-nums">R$ {vendor.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
@@ -136,7 +133,9 @@ const Reports: React.FC = () => {
                       <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${Math.min((vendor.totalValue / (totalRevenue || 1)) * 100, 100)}%` }}></div>
                    </div>
                 </div>
-              ))}
+              )) : (
+                <div className="py-20 text-center opacity-20 uppercase font-black text-xs tracking-widest">Aguardando dados da equipe</div>
+              )}
            </div>
         </div>
       </div>
