@@ -44,16 +44,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const DEFAULT_ADMIN: User = {
-  id: 'admin-01',
-  name: 'Administrador',
-  email: 'admin@erp.com',
-  role: UserRole.ADMIN,
-  storeId: 'matriz',
-  active: true,
-  avatar: 'https://picsum.photos/seed/admin/100/100'
-};
-
 const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
   [UserRole.ADMIN]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true },
   [UserRole.MANAGER]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true },
@@ -62,14 +52,11 @@ const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(DEFAULT_ADMIN);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [rolePermissions, setRolePermissions] = useState<Record<UserRole, RolePermissions>>(INITIAL_PERMS);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
-    companyName: 'ERP Retail',
-    logoUrl: '',
-    taxRegime: 'Simples Nacional',
-    allowNegativeStock: false
+    companyName: 'ERP Retail', logoUrl: '', taxRegime: 'Simples Nacional', allowNegativeStock: false
   });
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -82,22 +69,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshData = async () => {
     try {
       const [pRes, tRes, cRes, uRes, eRes, osRes, confRes, permRes] = await Promise.all([
-        fetch('/api/products').then(r => r.ok ? r.json() : []),
-        fetch('/api/transactions').then(r => r.ok ? r.json() : []),
-        fetch('/api/customers').then(r => r.ok ? r.json() : []),
-        fetch('/api/users').then(r => r.ok ? r.json() : []),
-        fetch('/api/establishments').then(r => r.ok ? r.json() : []),
-        fetch('/api/service-orders').then(r => r.ok ? r.json() : []),
+        fetch('/api/products').then(r => r.json()),
+        fetch('/api/transactions').then(r => r.json()),
+        fetch('/api/customers').then(r => r.json()),
+        fetch('/api/users').then(r => r.json()),
+        fetch('/api/establishments').then(r => r.json()),
+        fetch('/api/service-orders').then(r => r.json()),
         fetch('/api/config').then(r => r.ok ? r.json() : null),
         fetch('/api/permissions').then(r => r.ok ? r.json() : null)
       ]);
       
-      setProducts(pRes);
-      setTransactions(tRes);
-      setCustomers(cRes);
-      setUsers(uRes);
-      setEstablishments(eRes);
-      setServiceOrders(osRes);
+      setProducts(pRes || []);
+      setTransactions(tRes || []);
+      setCustomers(cRes || []);
+      setUsers(uRes || []);
+      setEstablishments(eRes || []);
+      setServiceOrders(osRes || []);
       
       if (confRes) setSystemConfig(confRes);
       if (permRes && Array.isArray(permRes)) {
@@ -106,7 +93,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setRolePermissions(permsMap);
       }
     } catch (error) {
-      console.error("Erro na sincronização Neon:", error);
+      console.error("Erro na sincronização:", error);
     } finally {
       setLoading(false);
     }
@@ -128,7 +115,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateServiceOrder = async (os: ServiceOrder) => {
-    await addServiceOrder(os); // Mesma rota POST com ON CONFLICT
+    await addServiceOrder(os);
   };
 
   const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
@@ -138,24 +125,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: any) => {
+    // Baixa de estoque
     for (const item of items) {
        const p = products.find(x => x.id === item.id);
        if (p) await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
     }
+
+    // Registro da Transação com Vendedor
+    const client = customers.find(c => c.id === clientId);
     await addTransaction({
       id: `SALE-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       description: `Venda PDV`,
       store: establishments.find(e => e.id === currentUser?.storeId)?.name || 'Principal',
       category: 'Venda',
-      status: TransactionStatus.APPROVED,
+      status: TransactionStatus.PAID,
       value: total,
       type: 'INCOME',
       method,
       clientId,
+      client: client?.name || 'Consumidor Final',
+      vendorId,
       items,
       ...cardDetails
     });
+    await refreshData();
   };
 
   return (
@@ -163,7 +157,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       currentUser, systemConfig, rolePermissions, products, transactions, customers, users, serviceOrders, establishments, loading, login, logout, 
       addProduct, updateProduct: addProduct, deleteProduct: (id) => {}, addTransaction, addCustomer, addUser, updateSelf: addUser, addServiceOrder, updateServiceOrder,
       deleteUser: (id) => {}, addEstablishment, deleteEstablishment: (id) => {}, processSale, updateStock: (id, q) => {}, bulkUpdateStock: (a) => {}, refreshData,
-      updateConfig: async () => {}, updateRolePermissions: async () => {}
+      updateConfig: async (conf) => { await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(conf)}); refreshData(); }, 
+      updateRolePermissions: async (role, perms) => { await fetch('/api/permissions', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({role, permissions: perms})}); refreshData(); }
     }}>
       {children}
     </AppContext.Provider>
