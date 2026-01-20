@@ -2,7 +2,7 @@
 import React, { ReactNode, useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../AppContext';
-import { UserRole } from '../types';
+import { UserRole, RolePermissions } from '../types';
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,31 +11,32 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, systemConfig } = useApp();
+  const { currentUser, logout, systemConfig, rolePermissions } = useApp();
   const isPDV = location.pathname === '/pdv';
-  
-  const isAdminOrManager = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
   
   const [isStockOpen, setIsStockOpen] = useState(location.pathname.includes('estoque') || location.pathname.includes('balanco'));
   const [isVendasOpen, setIsVendasOpen] = useState(location.pathname.includes('pdv') || location.pathname.includes('clientes'));
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isFinancialOpen, setIsFinancialOpen] = useState(location.pathname.includes('entradas') || location.pathname.includes('saidas') || location.pathname.includes('dre'));
 
   useEffect(() => {
     document.title = `${systemConfig.companyName} | Gestão Integrada`;
   }, [systemConfig.companyName]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  if (!currentUser) return null;
+
+  // Permissões do cargo atual
+  const perms = rolePermissions[currentUser.role] || {
+    dashboard: false, pdv: false, customers: false, reports: false, 
+    inventory: false, balance: false, incomes: false, expenses: false, 
+    financial: false, settings: false
   };
 
   if (isPDV) return <div className="h-screen w-full overflow-hidden">{children}</div>;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display">
-      <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4">
+      <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50">
         <div className="flex flex-col gap-8">
-          {/* Logo e Nome Dinâmicos */}
           <div className="flex items-center gap-3 px-2">
             {systemConfig.logoUrl ? (
               <img src={systemConfig.logoUrl} className="size-10 rounded-lg object-contain" alt="Logo" />
@@ -51,94 +52,118 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           <nav className="flex flex-col gap-1">
-            <SidebarItem to="/" icon="dashboard" label="Dashboard" />
+            {perms.dashboard && <SidebarItem to="/" icon="dashboard" label="Dashboard" />}
             
-            <div className="flex flex-col">
-              <button onClick={() => setIsVendasOpen(!isVendasOpen)} className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800 ${isVendasOpen ? 'text-primary font-black' : ''}`}>
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined">shopping_cart</span>
-                  <p className="text-sm">Vendas (PDV)</p>
-                </div>
-                <span className={`material-symbols-outlined transition-transform text-sm ${isVendasOpen ? 'rotate-180' : ''}`}>expand_more</span>
-              </button>
-              {isVendasOpen && (
-                <div className="flex flex-col gap-1 pl-9 mt-1">
-                  <NavLink to="/pdv" className={({isActive}) => `text-xs py-2 px-3 rounded-lg font-bold transition-all ${isActive ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}>Ir para Loja</NavLink>
-                  <NavLink to="/clientes" className={({isActive}) => `text-xs py-2 px-3 rounded-lg font-bold transition-all ${isActive ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}>Clientes</NavLink>
-                </div>
-              )}
-            </div>
+            {perms.pdv && <SidebarItem to="/pdv" icon="point_of_sale" label="Frente de Caixa" isPdvLink />}
 
-            <SidebarItem to="/relatorios" icon="analytics" label="Relatórios" />
-            
-            <div className="flex flex-col">
-              <button onClick={() => setIsStockOpen(!isStockOpen)} className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800 ${isStockOpen ? 'text-primary font-black' : ''}`}>
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined">inventory_2</span>
-                  <p className="text-sm">Estoque</p>
-                </div>
-                <span className={`material-symbols-outlined transition-transform text-sm ${isStockOpen ? 'rotate-180' : ''}`}>expand_more</span>
-              </button>
-              {isStockOpen && (
-                <div className="flex flex-col gap-1 pl-9 mt-1">
-                  <NavLink to="/estoque" className={({isActive}) => `text-xs py-2 px-3 rounded-lg font-bold transition-all ${isActive ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}>Itens</NavLink>
-                  <NavLink to="/balanco" className={({isActive}) => `text-xs py-2 px-3 rounded-lg font-bold transition-all ${isActive ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}>Balanço</NavLink>
-                </div>
-              )}
-            </div>
-
-            <SidebarItem to="/entradas" icon="arrow_circle_down" label="Entradas" />
-            <SidebarItem to="/saidas" icon="arrow_circle_up" label="Saídas" />
-            
-            {isAdminOrManager && (
-              <>
-                <SidebarItem to="/dre" icon="payments" label="Financeiro" />
-                <SidebarItem to="/config" icon="settings" label="Config" />
-              </>
+            {(perms.pdv || perms.customers || perms.reports) && (
+              <div className="flex flex-col">
+                <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-xl">payments</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Comercial</span>
+                  </div>
+                  <span className={`material-symbols-outlined text-sm transition-transform ${isVendasOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+                {isVendasOpen && (
+                  <div className="flex flex-col ml-9 mt-1 border-l border-slate-100 dark:border-slate-800 gap-1">
+                    {perms.customers && <SidebarSubItem to="/clientes" label="Clientes" />}
+                    {perms.reports && <SidebarSubItem to="/relatorios" label="Relatórios" />}
+                  </div>
+                )}
+              </div>
             )}
+
+            {(perms.inventory || perms.balance) && (
+              <div className="flex flex-col">
+                <button onClick={() => setIsStockOpen(!isStockOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-xl">inventory_2</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Logística</span>
+                  </div>
+                  <span className={`material-symbols-outlined text-sm transition-transform ${isStockOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+                {isStockOpen && (
+                  <div className="flex flex-col ml-9 mt-1 border-l border-slate-100 dark:border-slate-800 gap-1">
+                    {perms.inventory && <SidebarSubItem to="/estoque" label="Produtos" />}
+                    {perms.balance && <SidebarSubItem to="/balanco" label="Balanço" />}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(perms.incomes || perms.expenses || perms.financial) && (
+              <div className="flex flex-col">
+                <button onClick={() => setIsFinancialOpen(!isFinancialOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-xl">account_balance</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Financeiro</span>
+                  </div>
+                  <span className={`material-symbols-outlined text-sm transition-transform ${isFinancialOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+                {isFinancialOpen && (
+                  <div className="flex flex-col ml-9 mt-1 border-l border-slate-100 dark:border-slate-800 gap-1">
+                    {perms.incomes && <SidebarSubItem to="/entradas" label="Receitas" />}
+                    {perms.expenses && <SidebarSubItem to="/saidas" label="Despesas" />}
+                    {perms.financial && <SidebarSubItem to="/dre" label="DRE" />}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {perms.settings && <SidebarItem to="/config" icon="settings" label="Configurações" />}
           </nav>
         </div>
 
-        <div className="flex flex-col gap-1 pt-4 border-t border-slate-200 dark:border-slate-800">
-          <button onClick={() => setShowLogoutConfirm(true)} className="flex items-center gap-3 px-3 py-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all font-bold group">
-            <span className="material-symbols-outlined group-hover:rotate-12 transition-transform">logout</span>
-            <p className="text-xs uppercase tracking-widest font-black">Sair</p>
-          </button>
-
-          <div className="flex items-center gap-3 px-3 py-2 mt-2 border-t border-slate-100 dark:border-slate-800/50 pt-4">
-            <div className="size-8 rounded-full bg-slate-300 dark:bg-slate-700 bg-cover bg-center border border-slate-200 dark:border-slate-700" style={{ backgroundImage: `url(${currentUser?.avatar || 'https://picsum.photos/seed/user/100/100'})` }}></div>
-            <div className="flex flex-col min-w-0">
-              <p className="text-xs font-black truncate">{currentUser?.name}</p>
-              <p className="text-[9px] text-slate-400 font-bold uppercase">{currentUser?.role}</p>
-            </div>
-          </div>
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+           <div className="flex items-center gap-3 px-2 py-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
+              <div className="size-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
+                 {currentUser.name.charAt(0)}
+              </div>
+              <div className="flex flex-col min-w-0">
+                 <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase truncate">{currentUser.name}</p>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase truncate">{currentUser.role}</p>
+              </div>
+              <button onClick={() => { logout(); navigate('/login'); }} className="ml-auto size-8 flex items-center justify-center text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all">
+                <span className="material-symbols-outlined text-lg">logout</span>
+              </button>
+           </div>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-background-dark/50 flex flex-col">
-        {children}
-      </main>
-
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 text-center space-y-6">
-              <div className="size-16 bg-rose-100 text-rose-500 rounded-2xl flex items-center justify-center mx-auto"><span className="material-symbols-outlined text-4xl">logout</span></div>
-              <h3 className="text-xl font-black uppercase tracking-tight">Sair do Sistema?</h3>
-              <div className="flex gap-3">
-                 <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-4 bg-slate-100 rounded-2xl font-black text-xs uppercase">Não</button>
-                 <button onClick={handleLogout} className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-rose-500/20">Sim, Sair</button>
-              </div>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-16 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-end px-8">
+           <div className="flex items-center gap-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade:</span>
+              <span className="text-xs font-black text-primary uppercase">{currentUser.storeId}</span>
            </div>
+        </header>
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {children}
         </div>
-      )}
+      </main>
     </div>
   );
 };
 
-const SidebarItem: React.FC<{ to: string; icon: string; label: string }> = ({ to, icon, label }) => (
-  <NavLink to={to} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive ? 'bg-primary text-white font-bold' : 'text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-    <span className="material-symbols-outlined">{icon}</span>
-    <p className="text-sm">{label}</p>
+const SidebarItem: React.FC<{ to: string; icon: string; label: string; isPdvLink?: boolean }> = ({ to, icon, label, isPdvLink }) => (
+  <NavLink 
+    to={to} 
+    target={isPdvLink ? "_blank" : "_self"}
+    className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive && !isPdvLink ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+  >
+    <span className="material-symbols-outlined text-xl">{icon}</span>
+    <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+    {isPdvLink && <span className="material-symbols-outlined text-xs ml-auto">open_in_new</span>}
+  </NavLink>
+);
+
+const SidebarSubItem: React.FC<{ to: string; label: string }> = ({ to, label }) => (
+  <NavLink 
+    to={to} 
+    className={({ isActive }) => `px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${isActive ? 'text-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
+  >
+    {label}
   </NavLink>
 );
 

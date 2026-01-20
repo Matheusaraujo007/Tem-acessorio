@@ -2,55 +2,61 @@
 import React, { useMemo } from 'react';
 import { useApp } from '../AppContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { UserRole } from '../types';
 
 const Dashboard: React.FC = () => {
-  const { transactions, products } = useApp();
+  const { transactions, products, currentUser, establishments } = useApp();
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const currentStoreName = establishments.find(e => e.id === currentUser?.storeId)?.name || 'Principal';
 
   const today = new Date().toISOString().split('T')[0];
+  
+  // RESTRIÇÃO POR UNIDADE: Filtra as transações e o estoque por loja
   const salesToday = useMemo(() => {
     return (transactions || [])
-      .filter(t => t.date === today && t.type === 'INCOME')
+      .filter(t => t.date === today && t.type === 'INCOME' && (isAdmin || t.store === currentStoreName))
       .reduce((acc, t) => acc + t.value, 0);
-  }, [transactions, today]);
+  }, [transactions, today, isAdmin, currentStoreName]);
 
   const criticalStockCount = useMemo(() => {
     return (products || []).filter(p => p.stock <= 5).length;
   }, [products]);
 
   const netProfit = useMemo(() => {
-    const income = (transactions || []).filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
-    const expense = (transactions || []).filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
+    const incomes = (transactions || []).filter(t => t.type === 'INCOME' && (isAdmin || t.store === currentStoreName));
+    const expenses = (transactions || []).filter(t => t.type === 'EXPENSE' && (isAdmin || t.store === currentStoreName));
+    const income = incomes.reduce((acc, t) => acc + t.value, 0);
+    const expense = expenses.reduce((acc, t) => acc + t.value, 0);
     return income - expense;
-  }, [transactions]);
+  }, [transactions, isAdmin, currentStoreName]);
 
   const chartData = useMemo(() => {
     return [...(transactions || [])]
-      .filter(t => t.type === 'INCOME')
+      .filter(t => t.type === 'INCOME' && (isAdmin || t.store === currentStoreName))
       .slice(0, 6)
       .reverse();
-  }, [transactions]);
+  }, [transactions, isAdmin, currentStoreName]);
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-1">
-        <h3 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Performance Operacional</h3>
-        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Dados atualizados em tempo real através da integração PDV/Estoque.</p>
+        <h3 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
+          Performance {isAdmin ? 'Global' : `Unidade: ${currentStoreName}`}
+        </h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-tight">Painel de controle em tempo real.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard title="Vendas Hoje" value={`R$ ${salesToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Real" icon="monitoring" color="#136dec" />
-        <KPICard title="Resultado Período" value={`R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Consolidado" icon="account_balance" color="#10b981" />
-        <KPICard title="Itens Críticos" value={`${criticalStockCount} produtos`} trend="Alerta de Reposição" icon="inventory_2" color="#f59e0b" />
-        <KPICard title="Movimentações" value={`${(transactions || []).length} transações`} trend="Histórico" icon="history" color="#8b5cf6" />
+        <KPICard title="Vendas Hoje" value={`R$ ${salesToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Unidade" icon="monitoring" color="#136dec" />
+        <KPICard title="Resultado" value={`R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Consolidado" icon="account_balance" color="#10b981" />
+        <KPICard title="Itens Críticos" value={`${criticalStockCount} produtos`} trend="Alerta" icon="inventory_2" color="#f59e0b" />
+        <KPICard title="Movimentações" value={`${transactions.filter(t => isAdmin || t.store === currentStoreName).length}`} trend="Unidade" icon="history" color="#8b5cf6" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm">
            <div className="flex justify-between items-center mb-10">
-              <div>
-                <h4 className="text-lg font-black">Histórico de Receitas</h4>
-                <p className="text-xs text-slate-400 uppercase font-bold tracking-widest mt-1">Últimos Lançamentos</p>
-              </div>
+              <h4 className="text-lg font-black uppercase">Receitas Recentes</h4>
               <span className="material-symbols-outlined text-slate-300">more_horiz</span>
            </div>
            <div className="h-72 w-full">
@@ -67,45 +73,17 @@ const Dashboard: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
-                   Aguardando primeiras vendas...
-                </div>
+                <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">Aguardando Lançamentos...</div>
               )}
            </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-          <h4 className="text-lg font-black mb-1">Status do Catálogo</h4>
-          <p className="text-xs text-slate-400 uppercase font-bold tracking-widest mb-10">Saúde do Inventário</p>
-          
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+          <h4 className="text-lg font-black uppercase mb-10">Saúde do Estoque</h4>
           <div className="flex-1 flex flex-col justify-center gap-6">
-             <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold uppercase">
-                   <span className="text-emerald-500">Estoque Saudável</span>
-                   <span>{products.filter(p => p.stock > 10).length} itens</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                   <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${(products.filter(p => p.stock > 10).length / Math.max(products.length, 1)) * 100}%` }}></div>
-                </div>
-             </div>
-             <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold uppercase">
-                   <span className="text-amber-500">Nível Crítico</span>
-                   <span>{products.filter(p => p.stock > 0 && p.stock <= 10).length} itens</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                   <div className="bg-amber-500 h-full transition-all duration-1000" style={{ width: `${(products.filter(p => p.stock > 0 && p.stock <= 10).length / Math.max(products.length, 1)) * 100}%` }}></div>
-                </div>
-             </div>
-             <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold uppercase">
-                   <span className="text-rose-500">Esgotado</span>
-                   <span>{products.filter(p => p.stock === 0).length} itens</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                   <div className="bg-rose-500 h-full transition-all duration-1000" style={{ width: `${(products.filter(p => p.stock === 0).length / Math.max(products.length, 1)) * 100}%` }}></div>
-                </div>
-             </div>
+             <InventoryBar label="Estoque OK" color="bg-emerald-500" count={products.filter(p => p.stock > 10).length} total={products.length} />
+             <InventoryBar label="Nível Baixo" color="bg-amber-500" count={products.filter(p => p.stock > 0 && p.stock <= 10).length} total={products.length} />
+             <InventoryBar label="Esgotado" color="bg-rose-500" count={products.filter(p => p.stock === 0).length} total={products.length} />
           </div>
         </div>
       </div>
@@ -114,17 +92,21 @@ const Dashboard: React.FC = () => {
 };
 
 const KPICard: React.FC<{ title: string; value: string; trend: string; icon: string; color: string }> = ({ title, value, trend, icon, color }) => (
-  <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-all">
+  <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-all">
     <div className="flex justify-between items-start mb-6">
-      <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-primary group-hover:text-white transition-all">
-        <span className="material-symbols-outlined text-2xl">{icon}</span>
-      </div>
+      <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-2xl">{icon}</span></div>
       <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-lg">{trend}</span>
     </div>
     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{title}</p>
     <h4 className="text-2xl font-black tabular-nums">{value}</h4>
-    <div className="absolute -right-2 -bottom-2 opacity-[0.03] rotate-12 group-hover:opacity-[0.05] transition-opacity">
-       <span className="material-symbols-outlined text-8xl" style={{ color: color }}>{icon}</span>
+  </div>
+);
+
+const InventoryBar: React.FC<{ label: string; color: string; count: number; total: number }> = ({ label, color, count, total }) => (
+  <div className="space-y-2">
+    <div className="flex justify-between text-xs font-bold uppercase"><span>{label}</span><span>{count} itens</span></div>
+    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+      <div className={`${color} h-full transition-all duration-1000`} style={{ width: `${(count / Math.max(total, 1)) * 100}%` }}></div>
     </div>
   </div>
 );

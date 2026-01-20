@@ -66,6 +66,19 @@ export enum UserRole {
   VENDOR = 'VENDEDOR'
 }
 
+export interface RolePermissions {
+  dashboard: boolean;
+  pdv: boolean;
+  customers: boolean;
+  reports: boolean;
+  inventory: boolean;
+  balance: boolean;
+  incomes: boolean;
+  expenses: boolean;
+  financial: boolean;
+  settings: boolean;
+}
+
 export interface User {
   id: string;
   name: string;

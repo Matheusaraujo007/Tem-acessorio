@@ -20,12 +20,32 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
+    // Tabela de Permissões por Cargo
+    await sql`
+      CREATE TABLE IF NOT EXISTS role_permissions (
+        role TEXT PRIMARY KEY,
+        permissions JSONB NOT NULL
+      )
+    `;
+
     // Reset/Update da config principal
     await sql`
       INSERT INTO system_configs (id, company_name)
       VALUES ('main', 'ERP Retail')
       ON CONFLICT (id) DO NOTHING
     `;
+
+    // Inserir permissões padrão para cada cargo se não existirem
+    const defaultPerms = {
+      dashboard: true, pdv: true, customers: true, reports: true, 
+      inventory: true, balance: true, incomes: true, expenses: true, 
+      financial: true, settings: false
+    };
+
+    await sql`INSERT INTO role_permissions (role, permissions) VALUES ('GERENTE', ${JSON.stringify({...defaultPerms, settings: false})}) ON CONFLICT (role) DO NOTHING`;
+    await sql`INSERT INTO role_permissions (role, permissions) VALUES ('CAIXA', ${JSON.stringify({...defaultPerms, reports: false, financial: false, inventory: false, balance: false, settings: false})}) ON CONFLICT (role) DO NOTHING`;
+    await sql`INSERT INTO role_permissions (role, permissions) VALUES ('VENDEDOR', ${JSON.stringify({...defaultPerms, reports: false, financial: false, inventory: false, balance: false, settings: false, incomes: false, expenses: false})}) ON CONFLICT (role) DO NOTHING`;
+    await sql`INSERT INTO role_permissions (role, permissions) VALUES ('ADMINISTRADOR', ${JSON.stringify({...defaultPerms, settings: true})}) ON CONFLICT (role) DO NOTHING`;
 
     // Tabela de Usuários
     await sql`
