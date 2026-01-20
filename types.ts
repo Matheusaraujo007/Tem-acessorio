@@ -60,8 +60,9 @@ export interface BalanceSession {
 }
 
 export enum UserRole {
-  ADMIN = 'ADMIN',
+  ADMIN = 'ADMINISTRADOR',
   MANAGER = 'GERENTE',
+  CASHIER = 'CAIXA',
   VENDOR = 'VENDEDOR'
 }
 
@@ -73,6 +74,7 @@ export interface User {
   storeId: string;
   active: boolean;
   avatar?: string;
+  password?: string;
 }
 
 export interface Customer {

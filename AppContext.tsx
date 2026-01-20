@@ -1,19 +1,25 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Product, Transaction, TransactionStatus, Customer, User, CartItem } from './types';
-import { MOCK_USERS } from './constants';
+import { Product, Transaction, TransactionStatus, Customer, User, CartItem, Establishment, UserRole } from './types';
 
 interface AppContextType {
+  currentUser: User | null;
   products: Product[];
   transactions: Transaction[];
   customers: Customer[];
   users: User[];
+  establishments: Establishment[];
   loading: boolean;
   addProduct: (p: Product) => Promise<void>;
   updateProduct: (p: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   addTransaction: (t: Transaction) => Promise<void>;
   addCustomer: (c: Customer) => Promise<void>;
+  addUser: (u: User) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  transferUser: (userId: string, newStoreId: string) => Promise<void>;
+  addEstablishment: (e: Establishment) => Promise<void>;
+  deleteEstablishment: (id: string) => Promise<void>;
   processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments: number, authNumber: string, transactionSku: string }) => Promise<void>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
@@ -23,23 +29,45 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [users] = useState<User[]>(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refreshData = async () => {
     try {
-      const [pRes, tRes, cRes] = await Promise.all([
+      const [pRes, tRes, cRes, uRes, eRes] = await Promise.all([
         fetch('/api/products').then(r => r.ok ? r.json() : []),
         fetch('/api/transactions').then(r => r.ok ? r.json() : []),
-        fetch('/api/customers').then(r => r.ok ? r.json() : [])
+        fetch('/api/customers').then(r => r.ok ? r.json() : []),
+        fetch('/api/users').then(r => r.ok ? r.json() : []),
+        fetch('/api/establishments').then(r => r.ok ? r.json() : [])
       ]);
       
       setProducts(pRes);
       setTransactions(tRes);
       setCustomers(cRes);
+      setUsers(uRes);
+      setEstablishments(eRes);
+
+      // Simular login do primeiro Admin encontrado ou criar um mock
+      if (uRes.length > 0) {
+        const admin = uRes.find((u: User) => u.role === UserRole.ADMIN) || uRes[0];
+        setCurrentUser(admin);
+      } else {
+        // Fallback para desenvolvimento inicial
+        setCurrentUser({
+          id: 'admin-001',
+          name: 'Carlos Silva',
+          email: 'admin@erpretail.com',
+          role: UserRole.ADMIN,
+          storeId: 'matriz',
+          active: true
+        });
+      }
     } catch (error) {
       console.error("Erro ao carregar dados do Neon:", error);
     } finally {
@@ -63,7 +91,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateProduct = addProduct;
 
   const deleteProduct = async (id: string) => {
-    // Implementar DELETE na API no futuro se desejar remover fisicamente
     setProducts(prev => prev.filter(p => p.id !== id));
   };
   
@@ -73,6 +100,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(c)
     });
+    await refreshData();
+  };
+
+  const addUser = async (u: User) => {
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(u)
+    });
+    await refreshData();
+  };
+
+  const deleteUser = async (id: string) => {
+    await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
+    await refreshData();
+  };
+
+  const transferUser = async (userId: string, newStoreId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      const updatedUser = { ...user, storeId: newStoreId };
+      await addUser(updatedUser);
+    }
+  };
+
+  const addEstablishment = async (e: Establishment) => {
+    await fetch('/api/establishments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(e)
+    });
+    await refreshData();
+  };
+
+  const deleteEstablishment = async (id: string) => {
+    await fetch(`/api/establishments?id=${id}`, { method: 'DELETE' });
     await refreshData();
   };
 
@@ -115,7 +178,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     vendorId?: string,
     cardDetails?: { installments: number, authNumber: string, transactionSku: string }
   ) => {
-    // 1. Atualizar estoque de cada item no banco
     for (const item of items) {
        const product = products.find(p => p.id === item.id);
        if (product) {
@@ -148,14 +210,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       transactionSku: cardDetails?.transactionSku
     };
 
-    // 2. Salvar transação
     await addTransaction(newTrx);
   };
 
   return (
     <AppContext.Provider value={{ 
-      products, transactions, customers, users, loading, addProduct, updateProduct, deleteProduct, 
-      addTransaction, addCustomer, processSale, updateStock, bulkUpdateStock, refreshData
+      currentUser, products, transactions, customers, users, establishments, loading, addProduct, updateProduct, deleteProduct, 
+      addTransaction, addCustomer, addUser, deleteUser, transferUser, addEstablishment, deleteEstablishment, processSale, updateStock, bulkUpdateStock, refreshData
     }}>
       {children}
     </AppContext.Provider>

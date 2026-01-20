@@ -9,7 +9,30 @@ export default async function handler(req: any, res: any) {
   const sql = neon(process.env.DATABASE_URL);
 
   try {
-    // Criar Tabela de Produtos
+    // Tabela de Configurações Globais
+    await sql`
+      CREATE TABLE IF NOT EXISTS system_configs (
+        id TEXT PRIMARY KEY,
+        company_name TEXT,
+        tax_regime TEXT,
+        default_commission NUMERIC,
+        allow_negative_stock BOOLEAN DEFAULT FALSE
+      )
+    `;
+
+    // Tabela de Estabelecimentos
+    await sql`
+      CREATE TABLE IF NOT EXISTS establishments (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        cnpj TEXT,
+        location TEXT,
+        has_stock_access BOOLEAN DEFAULT TRUE,
+        active BOOLEAN DEFAULT TRUE
+      )
+    `;
+
+    // Tabela de Produtos
     await sql`
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
@@ -27,7 +50,7 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    // Criar Tabela de Transações
+    // Tabela de Transações
     await sql`
       CREATE TABLE IF NOT EXISTS transactions (
         id TEXT PRIMARY KEY,
@@ -50,7 +73,7 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    // Criar Tabela de Clientes
+    // Tabela de Clientes
     await sql`
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
@@ -61,7 +84,21 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    return res.status(200).json({ message: 'Banco de dados Neon inicializado com sucesso! As tabelas de Produtos, Vendas e Clientes estão prontas.' });
+    // Tabela de Usuários (Funcionários)
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE,
+        password TEXT,
+        role TEXT,
+        store_id TEXT,
+        active BOOLEAN DEFAULT TRUE,
+        avatar TEXT
+      )
+    `;
+
+    return res.status(200).json({ message: 'Infraestrutura Neon sincronizada com sucesso! Todas as tabelas corporativas estão prontas.' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
