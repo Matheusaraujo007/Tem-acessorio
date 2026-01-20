@@ -31,7 +31,6 @@ interface AppContextType {
   transferUser: (userId: string, newStoreId: string) => Promise<void>;
   addEstablishment: (e: Establishment) => Promise<void>;
   deleteEstablishment: (id: string) => Promise<void>;
-  // Fixed processSale signature to accept cardDetails as 6th argument
   processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => Promise<void>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
@@ -40,11 +39,18 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const DEFAULT_ADMIN: User = {
+  id: 'admin-01',
+  name: 'Administrador (Modo Livre)',
+  email: 'admin@erp.com',
+  role: UserRole.ADMIN,
+  storeId: 'matriz',
+  active: true,
+  avatar: 'https://picsum.photos/seed/admin/100/100'
+};
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('erp_session');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(DEFAULT_ADMIN);
 
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
     companyName: 'ERP Retail',
@@ -97,7 +103,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const login = async (email: string, pass: string) => {
-    // Busca na lista de usuários já carregada (ou faria um fetch específico por segurança)
     const user = users.find(u => u.email === email && u.password === pass);
     if (user) {
       setCurrentUser(user);
@@ -108,20 +113,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('erp_session');
+    setCurrentUser(DEFAULT_ADMIN);
   };
 
   const updateConfig = async (config: SystemConfig) => {
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config)
-    });
-    await refreshData();
+    // Atualização otimista (muda no topo na hora!)
+    setSystemConfig(config);
+    
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      // Sincroniza com o banco para garantir que as chaves snake_case foram gravadas
+      await refreshData();
+    } catch (error) {
+      console.error("Falha ao salvar configuração:", error);
+    }
   };
 
-  // Funções de CRUD (Mesma lógica mas usando refreshData no final)
   const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
@@ -133,7 +144,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateStock = async (id: string, qty: number) => { const p = products.find(x => x.id === id); if(p) await addProduct({...p, stock: p.stock + qty}); };
   const bulkUpdateStock = async (adjs: Record<string, number>) => { for(const [id, stock] of Object.entries(adjs)) { const p = products.find(x => x.id === id); if(p) await fetch('/api/products', {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({...p, stock})}); } await refreshData(); };
 
-  // Fixed processSale implementation to accept cardDetails as 6th argument
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => {
     for (const item of items) {
        const p = products.find(x => x.id === item.id);
