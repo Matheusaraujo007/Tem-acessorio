@@ -12,6 +12,7 @@ const PDV: React.FC = () => {
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOSModal, setShowOSModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successType, setSuccessType] = useState<'SALE' | 'OS'>('SALE');
   
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -63,6 +64,7 @@ const PDV: React.FC = () => {
     try {
       await processSale(cart, subtotal, paymentMethod, selectedCustomerId, selectedVendorId);
       setCart([]);
+      setSuccessType('SALE');
       setShowCheckout(false);
       setShowSuccessModal(true);
     } catch (e) {
@@ -72,6 +74,7 @@ const PDV: React.FC = () => {
 
   const handleFinalizeOS = async () => {
     if (!selectedCustomerId) { alert('Selecione um cliente para abrir a OS!'); return; }
+    if (!osDescription.trim()) { alert('Descreva o defeito ou serviço a ser realizado!'); return; }
     
     const customer = customers.find(c => c.id === selectedCustomerId);
     const newOS: ServiceOrder = {
@@ -87,11 +90,17 @@ const PDV: React.FC = () => {
       store: currentStore.name
     };
 
-    await addServiceOrder(newOS);
-    setCart([]);
-    setOsDescription('');
-    setShowOSModal(false);
-    alert('Ordem de Serviço Gerada!');
+    try {
+      await addServiceOrder(newOS);
+      setCart([]);
+      setOsDescription('');
+      setOsTechnician('');
+      setSuccessType('OS');
+      setShowOSModal(false);
+      setShowSuccessModal(true);
+    } catch (error) {
+      alert("Erro ao gerar Ordem de Serviço.");
+    }
   };
 
   return (
@@ -193,7 +202,10 @@ const PDV: React.FC = () => {
              </div>
              <div className="grid grid-cols-2 gap-4">
                 <button 
-                  disabled={cart.length === 0} onClick={() => setShowOSModal(true)}
+                  disabled={cart.length === 0} onClick={() => {
+                    if(!selectedCustomerId) { alert('Selecione um cliente primeiro!'); return; }
+                    setShowOSModal(true);
+                  }}
                   className="py-6 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined text-lg">build</span> Gerar OS
@@ -209,7 +221,72 @@ const PDV: React.FC = () => {
         </aside>
       </main>
 
-      {/* Outros modais seguem a mesma lógica... */}
+      {/* MODAL CHECKOUT */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase">Finalizar Venda</h3>
+                 <button onClick={() => setShowCheckout(false)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-10 space-y-8">
+                 <div className="grid grid-cols-2 gap-4">
+                    {['Dinheiro', 'Pix', 'Cartão de Débito', 'Cartão de Crédito'].map(m => (
+                      <button key={m} onClick={() => setPaymentMethod(m)} className={`p-6 rounded-2xl border-2 transition-all text-[10px] font-black uppercase text-center ${paymentMethod === m ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}>{m}</button>
+                    ))}
+                 </div>
+                 <div className="text-center">
+                    <p className="text-xs font-black text-slate-400 uppercase mb-2">Total a Receber</p>
+                    <p className="text-5xl font-black text-primary">R$ {subtotal.toLocaleString('pt-BR')}</p>
+                 </div>
+                 <button onClick={handleFinalizeSale} className="w-full h-20 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-widest shadow-2xl transition-all active:scale-95">Concluir Pagamento</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL ORDEM DE SERVIÇO */}
+      {showOSModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-amber-500 text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase">Abrir Ordem de Serviço</h3>
+                 <button onClick={() => setShowOSModal(false)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-10 space-y-6">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase px-4">Diagnóstico / Defeito Relatado</label>
+                    <textarea 
+                      required
+                      value={osDescription} 
+                      onChange={e => setOsDescription(e.target.value)} 
+                      className="w-full h-32 bg-slate-50 dark:bg-slate-800 rounded-2xl p-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-amber-500" 
+                      placeholder="Ex: Celular não liga, tela quebrada..."
+                    ></textarea>
+                 </div>
+                 <button onClick={handleFinalizeOS} className="w-full h-16 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95">Confirmar Geração de OS</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL SUCESSO */}
+      {showSuccessModal && (
+        <div className={`fixed inset-0 z-[300] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : 'bg-emerald-500'}`}>
+           <div className="text-center text-white space-y-6">
+              <span className="material-symbols-outlined text-[120px] animate-bounce">
+                {successType === 'OS' ? 'build' : 'check_circle'}
+              </span>
+              <h2 className="text-4xl font-black uppercase">
+                {successType === 'OS' ? 'OS Gerada com Sucesso!' : 'Venda Finalizada!'}
+              </h2>
+              <button onClick={() => setShowSuccessModal(false)} className="px-12 py-5 bg-white text-slate-900 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all">
+                Continuar
+              </button>
+           </div>
+        </div>
+      )}
+
       <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }`}</style>
     </div>
   );
