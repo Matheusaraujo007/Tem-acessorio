@@ -8,12 +8,10 @@ const Settings: React.FC = () => {
     currentUser, systemConfig, updateConfig, 
     users, addUser, deleteUser, 
     establishments, addEstablishment, deleteEstablishment, 
-    rolePermissions, updateRolePermissions,
-    refreshData 
+    rolePermissions, updateRolePermissions 
   } = useApp();
   
   const [activeTab, setActiveTab] = useState<'users' | 'stores' | 'general' | 'permissions' | 'db'>('general');
-  const [setupLoading, setSetupLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,8 +44,47 @@ const Settings: React.FC = () => {
 
   const handleTogglePermission = (role: UserRole, module: keyof RolePermissions) => {
     const current = rolePermissions[role];
+    if (!current) return;
     const updated = { ...current, [module]: !current[module] };
     updateRolePermissions(role, updated);
+  };
+
+  const handleEditUser = (u: User) => {
+    setUserForm(u);
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userForm.storeId) {
+      alert("Selecione uma unidade para este colaborador.");
+      return;
+    }
+    const newUser: User = {
+      ...userForm as User,
+      id: userForm.id || `user-${Date.now()}`,
+      password: userForm.password || '123456',
+      active: userForm.active !== undefined ? userForm.active : true
+    };
+    await addUser(newUser);
+    setShowUserModal(false);
+    setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: '', active: true });
+  };
+
+  const handleEditStore = (e: Establishment) => {
+    setStoreForm(e);
+    setShowStoreModal(true);
+  };
+
+  const handleSaveStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newStore: Establishment = {
+      ...storeForm as Establishment,
+      id: storeForm.id || `est-${Date.now()}`
+    };
+    await addEstablishment(newStore);
+    setShowStoreModal(false);
+    setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true });
   };
 
   const modules: { id: keyof RolePermissions; label: string }[] = [
@@ -84,7 +121,6 @@ const Settings: React.FC = () => {
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Visual da Marca</h4>
-                   {/* Resto do formulário mantido igual */}
                    <div className="flex flex-col items-center gap-6 p-8 bg-slate-50 dark:bg-slate-800/50 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700">
                       <div className="size-32 bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl flex items-center justify-center overflow-hidden border border-slate-100 dark:border-slate-700">
                          {localConfig.logoUrl ? (
@@ -136,8 +172,96 @@ const Settings: React.FC = () => {
                    </div>
                 </div>
              </div>
-             <button onClick={handleSaveConfig} className="w-full md:w-auto px-16 py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900">Salvar Alterações</button>
+             <button onClick={handleSaveConfig} className={`w-full md:w-auto px-16 py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl transition-all ${isSaving ? 'bg-emerald-500' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'}`}>
+               {isSaving ? 'Configuração Salva!' : 'Salvar Alterações'}
+             </button>
           </div>
+        )}
+
+        {activeTab === 'users' && (
+           <div className="space-y-6 animate-in slide-in-from-top-4">
+              <div className="flex justify-between items-center">
+                 <h3 className="text-xl font-black uppercase tracking-tight">Equipe Cadastrada</h3>
+                 <button onClick={() => { setUserForm({ name: '', email: '', password: '', role: UserRole.VENDOR, storeId: '', active: true }); setShowUserModal(true); }} className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+                    <span className="material-symbols-outlined">person_add</span> Novo Usuário
+                 </button>
+              </div>
+              
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] overflow-hidden shadow-sm">
+                 <table className="w-full text-left">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50">
+                       <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Colaborador</th>
+                          <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Cargo</th>
+                          <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Unidade</th>
+                          <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Ações</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                       {users.map(u => (
+                          <tr key={u.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all">
+                             <td className="px-10 py-6">
+                                <div className="flex items-center gap-4">
+                                   <div className="size-10 rounded-full bg-slate-200 dark:bg-slate-700 bg-cover shadow-inner" style={{backgroundImage: `url(${u.avatar || 'https://picsum.photos/seed/'+u.id+'/100/100'})`}}></div>
+                                   <div>
+                                      <p className="text-sm font-black uppercase">{u.name}</p>
+                                      <p className="text-[10px] font-bold text-slate-400">{u.email}</p>
+                                   </div>
+                                </div>
+                             </td>
+                             <td className="px-10 py-6">
+                                <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black rounded-lg uppercase">{u.role}</span>
+                             </td>
+                             <td className="px-10 py-6">
+                                <p className="text-xs font-bold text-slate-500 uppercase">
+                                   {establishments.find(e => e.id === u.storeId)?.name || 'UNIDADE NÃO ENCONTRADA'}
+                                </p>
+                             </td>
+                             <td className="px-10 py-6 text-right">
+                                <div className="flex justify-end gap-2">
+                                   <button onClick={() => handleEditUser(u)} className="size-10 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm"><span className="material-symbols-outlined">edit</span></button>
+                                   <button onClick={() => {if(confirm('Excluir este usuário?')) deleteUser(u.id)}} className="size-10 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
+                                </div>
+                             </td>
+                          </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+           </div>
+        )}
+
+        {activeTab === 'stores' && (
+           <div className="space-y-6 animate-in slide-in-from-top-4">
+              <div className="flex justify-between items-center">
+                 <h3 className="text-xl font-black uppercase tracking-tight">Unidades de Negócio</h3>
+                 <button onClick={() => { setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true }); setShowStoreModal(true); }} className="flex items-center gap-3 bg-emerald-500 text-white px-8 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">
+                    <span className="material-symbols-outlined">add_business</span> Nova Filial
+                 </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 {establishments.map(e => (
+                    <div key={e.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-primary transition-all relative">
+                       <div className="flex justify-between items-start mb-6">
+                          <div className="size-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all">
+                             <span className="material-symbols-outlined text-3xl">store</span>
+                          </div>
+                          <div className="flex gap-1">
+                             <button onClick={() => handleEditStore(e)} className="size-10 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">edit</span></button>
+                             <button onClick={() => {if(confirm('Excluir esta unidade?')) deleteEstablishment(e.id)}} className="size-10 bg-rose-500/5 text-rose-300 hover:text-rose-500 rounded-xl transition-all flex items-center justify-center"><span className="material-symbols-outlined">delete</span></button>
+                          </div>
+                       </div>
+                       <h4 className="text-lg font-black uppercase mb-1">{e.name}</h4>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">{e.cnpj || 'Sem CNPJ'}</p>
+                       <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                          <span className="material-symbols-outlined text-sm">location_on</span>
+                          {e.location || 'Localização não definida'}
+                       </div>
+                    </div>
+                 ))}
+              </div>
+           </div>
         )}
 
         {activeTab === 'permissions' && (
@@ -166,7 +290,7 @@ const Settings: React.FC = () => {
                             <label className="relative inline-flex items-center cursor-pointer scale-75">
                               <input 
                                 type="checkbox" 
-                                checked={rolePermissions[role][m.id]} 
+                                checked={rolePermissions[role] ? rolePermissions[role][m.id] : false} 
                                 onChange={() => handleTogglePermission(role, m.id)}
                                 className="sr-only peer" 
                               />
@@ -181,8 +305,93 @@ const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* Outras abas mantidas iguais... */}
+        {activeTab === 'db' && (
+          <div className="bg-white dark:bg-slate-900 p-12 rounded-[3rem] border border-slate-200 dark:border-slate-800 text-center space-y-6 animate-in slide-in-from-top-4">
+             <div className="size-24 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="material-symbols-outlined text-5xl">cloud_sync</span>
+             </div>
+             <h3 className="text-2xl font-black uppercase tracking-tight">Infraestrutura Neon Serverless</h3>
+             <p className="max-w-md mx-auto text-slate-500 font-bold text-sm uppercase leading-relaxed">Seu ERP está conectado a um banco de dados relacional de alta performance e escala automática.</p>
+             <button onClick={() => window.location.reload()} className="px-12 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all">Sincronizar Agora</button>
+          </div>
+        )}
       </div>
+
+      {/* MODAL USUARIO */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary text-white">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">{userForm.id ? 'Editar Acesso' : 'Novo Acesso'}</h3>
+                 <button onClick={() => setShowUserModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleSaveUser} className="p-10 space-y-6">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Nome Completo</label>
+                    <input required value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary" />
+                 </div>
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">E-mail Corporativo</label>
+                    <input type="email" required value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary" />
+                 </div>
+                 
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Unidade de Atuação</label>
+                    <select required value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary">
+                       <option value="">SELECIONE UMA UNIDADE</option>
+                       {establishments.map(est => (
+                         <option key={est.id} value={est.id}>{est.name}</option>
+                       ))}
+                    </select>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Cargo / Nível</label>
+                       <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary">
+                          {Object.values(UserRole).map(role => <option key={role} value={role}>{role}</option>)}
+                       </select>
+                    </div>
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Senha</label>
+                       <input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary" placeholder="••••••" />
+                    </div>
+                 </div>
+
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl mt-4">Confirmar Registro</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL FILIAL */}
+      {showStoreModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-emerald-500 text-white">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">{storeForm.id ? 'Editar Filial' : 'Nova Unidade'}</h3>
+                 <button onClick={() => setShowStoreModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleSaveStore} className="p-10 space-y-6">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Nome da Unidade</label>
+                    <input required value={storeForm.name} onChange={e => setStoreForm({...storeForm, name: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-emerald-500" />
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">CNPJ</label>
+                       <input value={storeForm.cnpj} onChange={e => setStoreForm({...storeForm, cnpj: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-emerald-500" placeholder="00.000.000/0001-00" />
+                    </div>
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Localização</label>
+                       <input value={storeForm.location} onChange={e => setStoreForm({...storeForm, location: e.target.value})} className="w-full h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Cidade - UF" />
+                    </div>
+                 </div>
+                 <button type="submit" className="w-full h-16 bg-emerald-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl mt-4">Salvar Unidade</button>
+              </form>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

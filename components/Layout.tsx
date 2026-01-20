@@ -4,9 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { UserRole, RolePermissions } from '../types';
 
-interface LayoutProps {
-  children: ReactNode;
-}
+interface LayoutProps { children: ReactNode; }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
@@ -24,7 +22,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (!currentUser) return null;
 
-  // Permissões do cargo atual
   const perms = rolePermissions[currentUser.role] || {
     dashboard: false, pdv: false, customers: false, reports: false, 
     inventory: false, balance: false, incomes: false, expenses: false, 
@@ -53,8 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <nav className="flex flex-col gap-1">
             {perms.dashboard && <SidebarItem to="/" icon="dashboard" label="Dashboard" />}
-            
-            {perms.pdv && <SidebarItem to="/pdv" icon="point_of_sale" label="Frente de Caixa" isPdvLink />}
+            {perms.pdv && <SidebarItem to="/pdv" icon="point_of_sale" label="Frente de Caixa" />}
 
             {(perms.pdv || perms.customers || perms.reports) && (
               <div className="flex flex-col">
@@ -146,15 +142,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   );
 };
 
-const SidebarItem: React.FC<{ to: string; icon: string; label: string; isPdvLink?: boolean }> = ({ to, icon, label, isPdvLink }) => (
+const SidebarItem: React.FC<{ to: string; icon: string; label: string }> = ({ to, icon, label }) => (
   <NavLink 
     to={to} 
-    target={isPdvLink ? "_blank" : "_self"}
-    className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive && !isPdvLink ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+    className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
   >
     <span className="material-symbols-outlined text-xl">{icon}</span>
     <span className="text-xs font-black uppercase tracking-widest">{label}</span>
-    {isPdvLink && <span className="material-symbols-outlined text-xs ml-auto">open_in_new</span>}
   </NavLink>
 );
 
