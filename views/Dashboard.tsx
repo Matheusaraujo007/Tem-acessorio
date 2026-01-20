@@ -1,26 +1,33 @@
 
 import React, { useMemo } from 'react';
 import { useApp } from '../AppContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const Dashboard: React.FC = () => {
   const { transactions, products } = useApp();
 
   const today = new Date().toISOString().split('T')[0];
   const salesToday = useMemo(() => {
-    return transactions
+    return (transactions || [])
       .filter(t => t.date === today && t.type === 'INCOME')
       .reduce((acc, t) => acc + t.value, 0);
   }, [transactions, today]);
 
   const criticalStockCount = useMemo(() => {
-    return products.filter(p => p.stock <= 5).length;
+    return (products || []).filter(p => p.stock <= 5).length;
   }, [products]);
 
   const netProfit = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
-    const expense = transactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
+    const income = (transactions || []).filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
+    const expense = (transactions || []).filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
     return income - expense;
+  }, [transactions]);
+
+  const chartData = useMemo(() => {
+    return [...(transactions || [])]
+      .filter(t => t.type === 'INCOME')
+      .slice(0, 6)
+      .reverse();
   }, [transactions]);
 
   return (
@@ -34,7 +41,7 @@ const Dashboard: React.FC = () => {
         <KPICard title="Vendas Hoje" value={`R$ ${salesToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Real" icon="monitoring" color="#136dec" />
         <KPICard title="Resultado Período" value={`R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Consolidado" icon="account_balance" color="#10b981" />
         <KPICard title="Itens Críticos" value={`${criticalStockCount} produtos`} trend="Alerta de Reposição" icon="inventory_2" color="#f59e0b" />
-        <KPICard title="Movimentações" value={`${transactions.length} transações`} trend="Histórico" icon="history" color="#8b5cf6" />
+        <KPICard title="Movimentações" value={`${(transactions || []).length} transações`} trend="Histórico" icon="history" color="#8b5cf6" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -47,17 +54,23 @@ const Dashboard: React.FC = () => {
               <span className="material-symbols-outlined text-slate-300">more_horiz</span>
            </div>
            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={transactions.slice(0, 6).reverse()}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" opacity={0.1} />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} />
-                  <YAxis hide />
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#136dec">
-                    {transactions.slice(0, 6).map((_, index) => <Cell key={index} fillOpacity={1 - (index * 0.1)} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" opacity={0.1} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} />
+                    <YAxis hide />
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#136dec">
+                      {chartData.map((_, index) => <Cell key={index} fillOpacity={1 - (index * 0.1)} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                   Aguardando primeiras vendas...
+                </div>
+              )}
            </div>
         </div>
 
@@ -72,7 +85,7 @@ const Dashboard: React.FC = () => {
                    <span>{products.filter(p => p.stock > 10).length} itens</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                   <div className="bg-emerald-500 h-full" style={{ width: `${(products.filter(p => p.stock > 10).length / products.length) * 100}%` }}></div>
+                   <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${(products.filter(p => p.stock > 10).length / Math.max(products.length, 1)) * 100}%` }}></div>
                 </div>
              </div>
              <div className="space-y-2">
@@ -81,7 +94,7 @@ const Dashboard: React.FC = () => {
                    <span>{products.filter(p => p.stock > 0 && p.stock <= 10).length} itens</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                   <div className="bg-amber-500 h-full" style={{ width: `${(products.filter(p => p.stock > 0 && p.stock <= 10).length / products.length) * 100}%` }}></div>
+                   <div className="bg-amber-500 h-full transition-all duration-1000" style={{ width: `${(products.filter(p => p.stock > 0 && p.stock <= 10).length / Math.max(products.length, 1)) * 100}%` }}></div>
                 </div>
              </div>
              <div className="space-y-2">
@@ -90,7 +103,7 @@ const Dashboard: React.FC = () => {
                    <span>{products.filter(p => p.stock === 0).length} itens</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                   <div className="bg-rose-500 h-full" style={{ width: `${(products.filter(p => p.stock === 0).length / products.length) * 100}%` }}></div>
+                   <div className="bg-rose-500 h-full transition-all duration-1000" style={{ width: `${(products.filter(p => p.stock === 0).length / Math.max(products.length, 1)) * 100}%` }}></div>
                 </div>
              </div>
           </div>
