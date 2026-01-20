@@ -44,6 +44,17 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Usuário padrão para acesso sem login
+const DEFAULT_USER: User = {
+  id: 'admin-01',
+  name: 'Administrador Sistema',
+  email: 'admin@erp.com',
+  role: UserRole.ADMIN,
+  storeId: 'matriz',
+  active: true,
+  avatar: 'https://picsum.photos/seed/admin/100/100'
+};
+
 const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
   [UserRole.ADMIN]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true },
   [UserRole.MANAGER]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true },
@@ -52,11 +63,11 @@ const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(DEFAULT_USER);
   const [rolePermissions, setRolePermissions] = useState<Record<UserRole, RolePermissions>>(INITIAL_PERMS);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
-    companyName: 'ERP Retail', logoUrl: '', taxRegime: 'Simples Nacional', allowNegativeStock: false
+    companyName: 'Retail Cloud ERP', logoUrl: '', taxRegime: 'Simples Nacional', allowNegativeStock: false
   });
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -68,28 +79,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshData = async () => {
     try {
-      const [pRes, tRes, cRes, uRes, eRes, osRes, confRes, permRes] = await Promise.all([
-        fetch('/api/products').then(r => r.json()),
-        fetch('/api/transactions').then(r => r.json()),
-        fetch('/api/customers').then(r => r.json()),
-        fetch('/api/users').then(r => r.json()),
-        fetch('/api/establishments').then(r => r.json()),
-        fetch('/api/service-orders').then(r => r.json()),
-        fetch('/api/config').then(r => r.ok ? r.json() : null),
-        fetch('/api/permissions').then(r => r.ok ? r.json() : null)
+      const responses = await Promise.all([
+        fetch('/api/products').then(r => r.json()).catch(() => []),
+        fetch('/api/transactions').then(r => r.json()).catch(() => []),
+        fetch('/api/customers').then(r => r.json()).catch(() => []),
+        fetch('/api/users').then(r => r.json()).catch(() => []),
+        fetch('/api/establishments').then(r => r.json()).catch(() => []),
+        fetch('/api/service-orders').then(r => r.json()).catch(() => []),
+        fetch('/api/config').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/permissions').then(r => r.ok ? r.json() : null).catch(() => null)
       ]);
       
-      setProducts(pRes || []);
-      setTransactions(tRes || []);
-      setCustomers(cRes || []);
-      setUsers(uRes || []);
-      setEstablishments(eRes || []);
-      setServiceOrders(osRes || []);
+      setProducts(responses[0]);
+      setTransactions(responses[1]);
+      setCustomers(responses[2]);
+      setUsers(responses[3]);
+      setEstablishments(responses[4]);
+      setServiceOrders(responses[5]);
       
-      if (confRes) setSystemConfig(confRes);
-      if (permRes && Array.isArray(permRes)) {
+      if (responses[6]) setSystemConfig(responses[6]);
+      if (responses[7] && Array.isArray(responses[7])) {
         const permsMap = { ...INITIAL_PERMS };
-        permRes.forEach((p: any) => { permsMap[p.role as UserRole] = p.permissions; });
+        responses[7].forEach((p: any) => { permsMap[p.role as UserRole] = p.permissions; });
         setRolePermissions(permsMap);
       }
     } catch (error) {
@@ -99,7 +110,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  useEffect(() => { refreshData(); }, []);
+  useEffect(() => {
+    // Tenta inicializar o banco se estiver vazio no primeiro acesso
+    fetch('/api/init-db').finally(() => refreshData());
+  }, []);
 
   const login = async (email: string, pass: string) => {
     const user = users.find(u => u.email === email && u.password === pass);
@@ -107,7 +121,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  const logout = () => setCurrentUser(null);
+  const logout = () => setCurrentUser(DEFAULT_USER);
 
   const addServiceOrder = async (os: ServiceOrder) => {
     await fetch('/api/service-orders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(os)});
@@ -125,13 +139,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: any) => {
-    // Baixa de estoque
     for (const item of items) {
        const p = products.find(x => x.id === item.id);
        if (p) await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
     }
 
-    // Registro da Transação com Vendedor
     const client = customers.find(c => c.id === clientId);
     await addTransaction({
       id: `SALE-${Date.now()}`,

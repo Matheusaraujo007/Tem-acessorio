@@ -30,7 +30,7 @@ const Settings: React.FC = () => {
   });
 
   useEffect(() => {
-    refreshData(); // Força atualização ao abrir configurações
+    refreshData();
     setLocalConfig(systemConfig);
   }, [systemConfig]);
 
@@ -65,10 +65,14 @@ const Settings: React.FC = () => {
   };
 
   const handleSyncDB = async () => {
-     if(confirm("Deseja forçar a sincronização de tabelas com o banco Neon?")) {
-        await fetch('/api/init-db');
-        await refreshData();
-        alert("Sincronização concluída!");
+     if(confirm("Deseja forçar a sincronização de tabelas com o banco Neon? Isso garantirá que todas as colunas novas existam.")) {
+        const res = await fetch('/api/init-db');
+        if (res.ok) {
+          await refreshData();
+          alert("Sincronização Neon concluída com sucesso!");
+        } else {
+          alert("Erro ao sincronizar banco.");
+        }
      }
   };
 
