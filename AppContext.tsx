@@ -106,7 +106,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const user = users.find(u => u.email === email && u.password === pass);
     if (user) {
       setCurrentUser(user);
-      localStorage.setItem('erp_session', JSON.stringify(user));
       return true;
     }
     return false;
@@ -117,19 +116,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateConfig = async (config: SystemConfig) => {
-    // Atualização otimista (muda no topo na hora!)
-    setSystemConfig(config);
+    // 1. Atualização otimista IMEDIATA para a UI não travar
+    setSystemConfig(prev => ({ ...prev, ...config }));
     
     try {
-      await fetch('/api/config', {
+      const response = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
-      // Sincroniza com o banco para garantir que as chaves snake_case foram gravadas
+      
+      if (!response.ok) throw new Error("Erro ao salvar no servidor");
+      
+      // 2. Re-sincroniza para garantir consistência
       await refreshData();
     } catch (error) {
       console.error("Falha ao salvar configuração:", error);
+      alert("Erro ao conectar com o banco Neon. Verifique se as tabelas foram criadas em Config > Infraestrutura.");
     }
   };
 
@@ -140,9 +143,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
   const deleteEstablishment = async (id: string) => { await fetch(`/api/establishments?id=${id}`, { method: 'DELETE' }); await refreshData(); };
   const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
-  const transferUser = async (userId: string, newStoreId: string) => { const user = users.find(u => u.id === userId); if(user) await addUser({...user, storeId: newStoreId}); };
   const updateStock = async (id: string, qty: number) => { const p = products.find(x => x.id === id); if(p) await addProduct({...p, stock: p.stock + qty}); };
   const bulkUpdateStock = async (adjs: Record<string, number>) => { for(const [id, stock] of Object.entries(adjs)) { const p = products.find(x => x.id === id); if(p) await fetch('/api/products', {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({...p, stock})}); } await refreshData(); };
+  const transferUser = async (userId: string, newStoreId: string) => { const user = users.find(u => u.id === userId); if(user) await addUser({...user, storeId: newStoreId}); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => {
     for (const item of items) {
