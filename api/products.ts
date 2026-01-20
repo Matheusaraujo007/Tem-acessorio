@@ -5,8 +5,7 @@ export default async function handler(req: any, res: any) {
   const sql = neon(process.env.DATABASE_URL!);
 
   if (req.method === 'GET') {
-    const products = await sql`SELECT * FROM products ORDER BY name ASC`;
-    // Mapear snake_case do Postgres para camelCase do App
+    const products = await sql`SELECT * FROM products ORDER BY is_service ASC, name ASC`;
     const mapped = products.map(p => ({
       id: p.id,
       name: p.name,
@@ -19,7 +18,8 @@ export default async function handler(req: any, res: any) {
       image: p.image,
       brand: p.brand,
       unit: p.unit,
-      location: p.location
+      location: p.location,
+      isService: p.is_service
     }));
     return res.status(200).json(mapped);
   }
@@ -27,8 +27,8 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'POST') {
     const p = req.body;
     await sql`
-      INSERT INTO products (id, name, sku, barcode, category, cost_price, sale_price, stock, image, brand, unit, location)
-      VALUES (${p.id}, ${p.name}, ${p.sku}, ${p.barcode}, ${p.category}, ${p.costPrice}, ${p.salePrice}, ${p.stock}, ${p.image}, ${p.brand}, ${p.unit}, ${p.location})
+      INSERT INTO products (id, name, sku, barcode, category, cost_price, sale_price, stock, image, brand, unit, location, is_service)
+      VALUES (${p.id}, ${p.name}, ${p.sku}, ${p.barcode}, ${p.category}, ${p.costPrice}, ${p.salePrice}, ${p.stock}, ${p.image}, ${p.brand}, ${p.unit}, ${p.location}, ${p.isService || false})
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         sku = EXCLUDED.sku,
@@ -40,7 +40,8 @@ export default async function handler(req: any, res: any) {
         image = EXCLUDED.image,
         brand = EXCLUDED.brand,
         unit = EXCLUDED.unit,
-        location = EXCLUDED.location
+        location = EXCLUDED.location,
+        is_service = EXCLUDED.is_service
     `;
     return res.status(200).json({ success: true });
   }

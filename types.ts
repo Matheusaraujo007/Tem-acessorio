@@ -13,6 +13,7 @@ export interface Product {
   unit?: string;
   weight?: string;
   location?: string;
+  isService?: boolean; // Define se é um serviço (mão de obra) ou produto
 }
 
 export interface CartItem extends Product {
