@@ -15,6 +15,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isStockOpen, setIsStockOpen] = useState(location.pathname.includes('estoque') || location.pathname.includes('balanco'));
   const [isVendasOpen, setIsVendasOpen] = useState(location.pathname.includes('pdv') || location.pathname.includes('clientes'));
   const [isFinancialOpen, setIsFinancialOpen] = useState(location.pathname.includes('entradas') || location.pathname.includes('saidas') || location.pathname.includes('dre'));
+  const [isOSOpen, setIsOSOpen] = useState(location.pathname.includes('servicos'));
 
   useEffect(() => {
     document.title = `${systemConfig.companyName} | Gestão Integrada`;
@@ -25,7 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const perms = rolePermissions[currentUser.role] || {
     dashboard: false, pdv: false, customers: false, reports: false, 
     inventory: false, balance: false, incomes: false, expenses: false, 
-    financial: false, settings: false
+    financial: false, settings: false, serviceOrders: false
   };
 
   if (isPDV) return <div className="h-screen w-full overflow-hidden">{children}</div>;
@@ -44,19 +45,38 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             )}
             <div className="flex flex-col min-w-0">
               <h1 className="text-slate-900 dark:text-white text-sm font-black leading-tight truncate uppercase">{systemConfig.companyName}</h1>
-              <p className="text-slate-500 dark:text-[#9da8b9] text-[10px] font-bold uppercase tracking-widest">Painel Gestor</p>
+              <p className="text-slate-500 dark:text-[#9da8b9] text-[10px] font-bold uppercase tracking-widest">Gestão Total</p>
             </div>
           </div>
 
           <nav className="flex flex-col gap-1">
             {perms.dashboard && <SidebarItem to="/" icon="dashboard" label="Dashboard" />}
+            
+            {perms.serviceOrders && (
+              <div className="flex flex-col">
+                <button onClick={() => setIsOSOpen(!isOSOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-xl">build</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Serviços</span>
+                  </div>
+                  <span className={`material-symbols-outlined text-sm transition-transform ${isOSOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+                {isOSOpen && (
+                  <div className="flex flex-col ml-9 mt-1 border-l border-slate-100 dark:border-slate-800 gap-1">
+                    <SidebarSubItem to="/servicos?tab=create" label="Criar Serviço" />
+                    <SidebarSubItem to="/servicos?tab=list" label="Gerenciar OS" />
+                  </div>
+                )}
+              </div>
+            )}
+
             {perms.pdv && <SidebarItem to="/pdv" icon="point_of_sale" label="Frente de Caixa" />}
 
             {(perms.pdv || perms.customers || perms.reports) && (
               <div className="flex flex-col">
                 <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50">
                   <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-xl">payments</span>
+                    <span className="material-symbols-outlined text-xl">shopping_cart</span>
                     <span className="text-xs font-black uppercase tracking-widest">Comercial</span>
                   </div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isVendasOpen ? 'rotate-180' : ''}`}>expand_more</span>
@@ -75,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button onClick={() => setIsStockOpen(!isStockOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-[#9da8b9] hover:bg-slate-100 dark:hover:bg-slate-800/50">
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-xl">inventory_2</span>
-                    <span className="text-xs font-black uppercase tracking-widest">Logística</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Estoque</span>
                   </div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isStockOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
@@ -116,11 +136,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="size-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
                  {currentUser.name.charAt(0)}
               </div>
-              <div className="flex flex-col min-w-0">
+              <div className="flex flex-col min-w-0 flex-1">
                  <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase truncate">{currentUser.name}</p>
                  <p className="text-[9px] font-bold text-slate-400 uppercase truncate">{currentUser.role}</p>
               </div>
-              <button onClick={() => { logout(); navigate('/login'); }} className="ml-auto size-8 flex items-center justify-center text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all">
+              <button onClick={() => { logout(); navigate('/login'); }} className="size-8 flex items-center justify-center text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all">
                 <span className="material-symbols-outlined text-lg">logout</span>
               </button>
            </div>

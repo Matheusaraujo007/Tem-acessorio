@@ -12,23 +12,17 @@ import Settings from './views/Settings';
 import Reports from './views/Reports';
 import Balance from './views/Balance';
 import Customers from './views/Customers';
+import ServiceOrders from './views/ServiceOrders';
 import Login from './views/Login';
 
 const ProtectedRoute: React.FC<{ children: React.ReactElement; module?: string }> = ({ children, module }) => {
   const { currentUser, rolePermissions, loading } = useApp();
-  const location = useLocation();
-
   if (loading) return <div className="h-screen flex items-center justify-center font-black uppercase tracking-widest">Carregando ERP...</div>;
-  
   if (!currentUser) return <Navigate to="/login" replace />;
-
   if (module) {
     const perms = rolePermissions[currentUser.role];
-    if (perms && !perms[module as keyof typeof perms]) {
-      return <Navigate to="/" replace />;
-    }
+    if (perms && !perms[module as keyof typeof perms]) return <Navigate to="/" replace />;
   }
-
   return children;
 };
 
@@ -42,6 +36,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/relatorios" element={<ProtectedRoute module="reports"><Layout><Reports /></Layout></ProtectedRoute>} />
       <Route path="/estoque" element={<ProtectedRoute module="inventory"><Layout><Inventory /></Layout></ProtectedRoute>} />
       <Route path="/balanco" element={<ProtectedRoute module="balance"><Layout><Balance /></Layout></ProtectedRoute>} />
+      <Route path="/servicos" element={<ProtectedRoute module="serviceOrders"><Layout><ServiceOrders /></Layout></ProtectedRoute>} />
       <Route path="/entradas" element={<ProtectedRoute module="incomes"><Layout><Transactions type="INCOME" /></Layout></ProtectedRoute>} />
       <Route path="/saidas" element={<ProtectedRoute module="expenses"><Layout><Transactions type="EXPENSE" /></Layout></ProtectedRoute>} />
       <Route path="/dre" element={<ProtectedRoute module="financial"><Layout><DRE /></Layout></ProtectedRoute>} />
@@ -51,14 +46,12 @@ const AppRoutes: React.FC = () => {
   );
 };
 
-const App: React.FC = () => {
-  return (
-    <AppProvider>
-      <HashRouter>
-        <AppRoutes />
-      </HashRouter>
-    </AppProvider>
-  );
-};
+const App: React.FC = () => (
+  <AppProvider>
+    <HashRouter>
+      <AppRoutes />
+    </HashRouter>
+  </AppProvider>
+);
 
 export default App;

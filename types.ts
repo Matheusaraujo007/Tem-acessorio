@@ -26,6 +26,27 @@ export enum TransactionStatus {
   APPROVED = 'APROVADO'
 }
 
+export enum ServiceOrderStatus {
+  OPEN = 'ABERTA',
+  IN_PROGRESS = 'EM ANDAMENTO',
+  FINISHED = 'CONCLUÍDA',
+  CANCELLED = 'CANCELADA'
+}
+
+export interface ServiceOrder {
+  id: string;
+  date: string;
+  customerName: string;
+  customerId: string;
+  description: string;
+  status: ServiceOrderStatus;
+  items: CartItem[];
+  totalValue: number;
+  technicianName?: string;
+  expectedDate?: string;
+  store: string;
+}
+
 export interface Transaction {
   id: string;
   date: string;
@@ -46,17 +67,17 @@ export interface Transaction {
   transactionSku?: string;
 }
 
-export interface BalanceItem {
-  productId: string;
-  expected: number;
-  counted: number;
-}
-
-export interface BalanceSession {
+export interface User {
   id: string;
-  date: string;
-  status: 'OPEN' | 'FINISHED';
-  items: Record<string, number>; // productId -> countedQuantity
+  name: string;
+  email: string;
+  role: UserRole;
+  storeId: string;
+  active: boolean;
+  avatar?: string;
+  password?: string;
+  commissionActive?: boolean;
+  commissionRate?: number;
 }
 
 export enum UserRole {
@@ -77,17 +98,7 @@ export interface RolePermissions {
   expenses: boolean;
   financial: boolean;
   settings: boolean;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  storeId: string;
-  active: boolean;
-  avatar?: string;
-  password?: string;
+  serviceOrders: boolean;
 }
 
 export interface Customer {
