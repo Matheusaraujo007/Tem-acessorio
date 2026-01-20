@@ -32,16 +32,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshData = async () => {
     try {
       const [pRes, tRes, cRes] = await Promise.all([
-        fetch('/api/products'),
-        fetch('/api/transactions'),
-        fetch('/api/customers')
+        fetch('/api/products').then(r => r.ok ? r.json() : []),
+        fetch('/api/transactions').then(r => r.ok ? r.json() : []),
+        fetch('/api/customers').then(r => r.ok ? r.json() : [])
       ]);
       
-      if (pRes.ok) setProducts(await pRes.json());
-      if (tRes.ok) setTransactions(await tRes.json());
-      if (cRes.ok) setCustomers(await cRes.json());
+      setProducts(pRes);
+      setTransactions(tRes);
+      setCustomers(cRes);
     } catch (error) {
-      console.error("Erro ao carregar dados do banco:", error);
+      console.error("Erro ao carregar dados do Neon:", error);
     } finally {
       setLoading(false);
     }
@@ -60,10 +60,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await refreshData();
   };
 
-  const updateProduct = addProduct; // No Neon usamos ON CONFLICT para update
+  const updateProduct = addProduct;
 
   const deleteProduct = async (id: string) => {
-    // Implementar DELETE na API se necessário
+    // Implementar DELETE na API no futuro se desejar remover fisicamente
     setProducts(prev => prev.filter(p => p.id !== id));
   };
   
@@ -88,7 +88,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateStock = async (productId: string, quantity: number) => {
     const product = products.find(p => p.id === productId);
     if (product) {
-      await addProduct({ ...product, stock: product.stock + quantity });
+      const updatedProduct = { ...product, stock: product.stock + quantity };
+      await addProduct(updatedProduct);
     }
   };
 
@@ -96,9 +97,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     for (const [id, stock] of Object.entries(adjustments)) {
       const product = products.find(p => p.id === id);
       if (product) {
-        await addProduct({ ...product, stock });
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...product, stock })
+        });
       }
     }
+    await refreshData();
   };
 
   const processSale = async (
@@ -109,14 +115,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     vendorId?: string,
     cardDetails?: { installments: number, authNumber: string, transactionSku: string }
   ) => {
-    // Atualizar estoque local para velocidade
+    // 1. Atualizar estoque de cada item no banco
     for (const item of items) {
-       await updateStock(item.id, -item.quantity);
+       const product = products.find(p => p.id === item.id);
+       if (product) {
+         await fetch('/api/products', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ ...product, stock: product.stock - item.quantity })
+         });
+       }
     }
 
     const customer = customers.find(c => c.id === clientId);
     const newTrx: Transaction = {
-      id: `SALE-${Math.floor(Math.random() * 100000)}`,
+      id: `SALE-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       description: `Venda PDV - ${items.length} itens`,
@@ -134,6 +147,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       authNumber: cardDetails?.authNumber,
       transactionSku: cardDetails?.transactionSku
     };
+
+    // 2. Salvar transação
     await addTransaction(newTrx);
   };
 

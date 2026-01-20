@@ -43,7 +43,10 @@ export default async function handler(req: any, res: any) {
         client TEXT,
         client_id TEXT,
         vendor_id TEXT,
-        items JSONB
+        items JSONB,
+        installments INTEGER,
+        auth_number TEXT,
+        transaction_sku TEXT
       )
     `;
 
@@ -58,7 +61,7 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    return res.status(200).json({ message: 'Banco de dados inicializado com sucesso!' });
+    return res.status(200).json({ message: 'Banco de dados Neon inicializado com sucesso! As tabelas de Produtos, Vendas e Clientes estão prontas.' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
