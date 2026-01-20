@@ -2,14 +2,25 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Product, Transaction, TransactionStatus, Customer, User, CartItem, Establishment, UserRole } from './types';
 
+interface SystemConfig {
+  companyName: string;
+  logoUrl?: string;
+  taxRegime: string;
+  allowNegativeStock: boolean;
+}
+
 interface AppContextType {
   currentUser: User | null;
+  systemConfig: SystemConfig;
   products: Product[];
   transactions: Transaction[];
   customers: Customer[];
   users: User[];
   establishments: Establishment[];
   loading: boolean;
+  login: (email: string, pass: string) => Promise<boolean>;
+  logout: () => void;
+  updateConfig: (config: SystemConfig) => Promise<void>;
   addProduct: (p: Product) => Promise<void>;
   updateProduct: (p: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
@@ -20,7 +31,8 @@ interface AppContextType {
   transferUser: (userId: string, newStoreId: string) => Promise<void>;
   addEstablishment: (e: Establishment) => Promise<void>;
   deleteEstablishment: (id: string) => Promise<void>;
-  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments: number, authNumber: string, transactionSku: string }) => Promise<void>;
+  // Fixed processSale signature to accept cardDetails as 6th argument
+  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => Promise<void>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -29,7 +41,18 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('erp_session');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [systemConfig, setSystemConfig] = useState<SystemConfig>({
+    companyName: 'ERP Retail',
+    logoUrl: '',
+    taxRegime: 'Simples Nacional',
+    allowNegativeStock: false
+  });
+
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -39,12 +62,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshData = async () => {
     try {
-      const [pRes, tRes, cRes, uRes, eRes] = await Promise.all([
+      const [pRes, tRes, cRes, uRes, eRes, confRes] = await Promise.all([
         fetch('/api/products').then(r => r.ok ? r.json() : []),
         fetch('/api/transactions').then(r => r.ok ? r.json() : []),
         fetch('/api/customers').then(r => r.ok ? r.json() : []),
         fetch('/api/users').then(r => r.ok ? r.json() : []),
-        fetch('/api/establishments').then(r => r.ok ? r.json() : [])
+        fetch('/api/establishments').then(r => r.ok ? r.json() : []),
+        fetch('/api/config').then(r => r.ok ? r.json() : null)
       ]);
       
       setProducts(pRes);
@@ -52,24 +76,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCustomers(cRes);
       setUsers(uRes);
       setEstablishments(eRes);
-
-      // Simular login do primeiro Admin encontrado ou criar um mock
-      if (uRes.length > 0) {
-        const admin = uRes.find((u: User) => u.role === UserRole.ADMIN) || uRes[0];
-        setCurrentUser(admin);
-      } else {
-        // Fallback para desenvolvimento inicial
-        setCurrentUser({
-          id: 'admin-001',
-          name: 'Carlos Silva',
-          email: 'admin@erpretail.com',
-          role: UserRole.ADMIN,
-          storeId: 'matriz',
-          active: true
+      
+      if (confRes) {
+        setSystemConfig({
+          companyName: confRes.company_name || 'ERP Retail',
+          logoUrl: confRes.logo_url || '',
+          taxRegime: confRes.tax_regime || 'Simples Nacional',
+          allowNegativeStock: !!confRes.allow_negative_stock
         });
       }
     } catch (error) {
-      console.error("Erro ao carregar dados do Neon:", error);
+      console.error("Erro na sincronização Neon:", error);
     } finally {
       setLoading(false);
     }
@@ -79,144 +96,72 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     refreshData();
   }, []);
 
-  const addProduct = async (p: Product) => {
-    await fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(p)
-    });
-    await refreshData();
-  };
-
-  const updateProduct = addProduct;
-
-  const deleteProduct = async (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-  };
-  
-  const addCustomer = async (c: Customer) => {
-    await fetch('/api/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(c)
-    });
-    await refreshData();
-  };
-
-  const addUser = async (u: User) => {
-    await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(u)
-    });
-    await refreshData();
-  };
-
-  const deleteUser = async (id: string) => {
-    await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
-    await refreshData();
-  };
-
-  const transferUser = async (userId: string, newStoreId: string) => {
-    const user = users.find(u => u.id === userId);
+  const login = async (email: string, pass: string) => {
+    // Busca na lista de usuários já carregada (ou faria um fetch específico por segurança)
+    const user = users.find(u => u.email === email && u.password === pass);
     if (user) {
-      const updatedUser = { ...user, storeId: newStoreId };
-      await addUser(updatedUser);
+      setCurrentUser(user);
+      localStorage.setItem('erp_session', JSON.stringify(user));
+      return true;
     }
+    return false;
   };
 
-  const addEstablishment = async (e: Establishment) => {
-    await fetch('/api/establishments', {
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('erp_session');
+  };
+
+  const updateConfig = async (config: SystemConfig) => {
+    await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(e)
+      body: JSON.stringify(config)
     });
     await refreshData();
   };
 
-  const deleteEstablishment = async (id: string) => {
-    await fetch(`/api/establishments?id=${id}`, { method: 'DELETE' });
-    await refreshData();
-  };
+  // Funções de CRUD (Mesma lógica mas usando refreshData no final)
+  const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
+  const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
+  const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
+  const deleteUser = async (id: string) => { await fetch(`/api/users?id=${id}`, { method: 'DELETE' }); await refreshData(); };
+  const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
+  const deleteEstablishment = async (id: string) => { await fetch(`/api/establishments?id=${id}`, { method: 'DELETE' }); await refreshData(); };
+  const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
+  const transferUser = async (userId: string, newStoreId: string) => { const user = users.find(u => u.id === userId); if(user) await addUser({...user, storeId: newStoreId}); };
+  const updateStock = async (id: string, qty: number) => { const p = products.find(x => x.id === id); if(p) await addProduct({...p, stock: p.stock + qty}); };
+  const bulkUpdateStock = async (adjs: Record<string, number>) => { for(const [id, stock] of Object.entries(adjs)) { const p = products.find(x => x.id === id); if(p) await fetch('/api/products', {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({...p, stock})}); } await refreshData(); };
 
-  const addTransaction = async (t: Transaction) => {
-    await fetch('/api/transactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(t)
-    });
-    await refreshData();
-  };
-
-  const updateStock = async (productId: string, quantity: number) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-      const updatedProduct = { ...product, stock: product.stock + quantity };
-      await addProduct(updatedProduct);
-    }
-  };
-
-  const bulkUpdateStock = async (adjustments: Record<string, number>) => {
-    for (const [id, stock] of Object.entries(adjustments)) {
-      const product = products.find(p => p.id === id);
-      if (product) {
-        await fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...product, stock })
-        });
-      }
-    }
-    await refreshData();
-  };
-
-  const processSale = async (
-    items: CartItem[], 
-    total: number, 
-    method: string, 
-    clientId?: string, 
-    vendorId?: string,
-    cardDetails?: { installments: number, authNumber: string, transactionSku: string }
-  ) => {
+  // Fixed processSale implementation to accept cardDetails as 6th argument
+  const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => {
     for (const item of items) {
-       const product = products.find(p => p.id === item.id);
-       if (product) {
-         await fetch('/api/products', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ ...product, stock: product.stock - item.quantity })
-         });
-       }
+       const p = products.find(x => x.id === item.id);
+       if (p) await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
     }
-
     const customer = customers.find(c => c.id === clientId);
-    const newTrx: Transaction = {
+    await addTransaction({
       id: `SALE-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
-      dueDate: new Date().toISOString().split('T')[0],
       description: `Venda PDV - ${items.length} itens`,
-      store: 'Loja Principal',
+      store: establishments.find(e => e.id === currentUser?.storeId)?.name || 'Principal',
       category: 'Venda',
       status: TransactionStatus.APPROVED,
       value: total,
       type: 'INCOME',
-      method: method,
-      client: customer ? customer.name : 'Consumidor Final',
-      clientId: clientId,
-      vendorId: vendorId,
-      items: items,
-      installments: cardDetails?.installments,
-      authNumber: cardDetails?.authNumber,
-      transactionSku: cardDetails?.transactionSku
-    };
-
-    await addTransaction(newTrx);
+      method,
+      client: customer?.name || 'Consumidor Final',
+      clientId,
+      vendorId,
+      items,
+      ...cardDetails
+    });
   };
 
   return (
     <AppContext.Provider value={{ 
-      currentUser, products, transactions, customers, users, establishments, loading, addProduct, updateProduct, deleteProduct, 
-      addTransaction, addCustomer, addUser, deleteUser, transferUser, addEstablishment, deleteEstablishment, processSale, updateStock, bulkUpdateStock, refreshData
+      currentUser, systemConfig, products, transactions, customers, users, establishments, loading, login, logout, updateConfig,
+      addProduct, updateProduct: addProduct, deleteProduct: (id) => deleteUser(id), addTransaction, addCustomer, addUser, deleteUser, transferUser, addEstablishment, deleteEstablishment, processSale, updateStock, bulkUpdateStock, refreshData
     }}>
       {children}
     </AppContext.Provider>
