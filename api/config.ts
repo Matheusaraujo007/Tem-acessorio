@@ -6,7 +6,7 @@ export default async function handler(req: any, res: any) {
   const sql = neon(process.env.DATABASE_URL);
 
   try {
-    // 1. Garantir que a tabela existe com as colunas primárias
+    // Garante a existência da tabela
     await sql`
       CREATE TABLE IF NOT EXISTS system_configs (
         id TEXT PRIMARY KEY,
@@ -17,27 +17,27 @@ export default async function handler(req: any, res: any) {
       )
     `;
 
-    // 2. MIGRAÇÃO FORÇADA: Caso a tabela já exista sem essas colunas
-    const checkCols = await sql`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'system_configs'
-    `;
-    
-    const columns = checkCols.map(c => c.column_name);
-    
-    if (!columns.includes('company_name')) await sql`ALTER TABLE system_configs ADD COLUMN company_name TEXT DEFAULT 'ERP Retail'`;
-    if (!columns.includes('logo_url')) await sql`ALTER TABLE system_configs ADD COLUMN logo_url TEXT`;
-    if (!columns.includes('tax_regime')) await sql`ALTER TABLE system_configs ADD COLUMN tax_regime TEXT DEFAULT 'Simples Nacional'`;
-    if (!columns.includes('allow_negative_stock')) await sql`ALTER TABLE system_configs ADD COLUMN allow_negative_stock BOOLEAN DEFAULT FALSE`;
-
     if (req.method === 'GET') {
       const data = await sql`SELECT * FROM system_configs WHERE id = 'main'`;
       if (data.length === 0) {
-        await sql`INSERT INTO system_configs (id, company_name) VALUES ('main', 'ERP Retail')`;
-        return res.status(200).json({ id: 'main', company_name: 'ERP Retail' });
+        const initial = { id: 'main', company_name: 'ERP Retail', tax_regime: 'Simples Nacional' };
+        await sql`INSERT INTO system_configs (id, company_name, tax_regime) VALUES ('main', 'ERP Retail', 'Simples Nacional')`;
+        return res.status(200).json({
+          companyName: initial.company_name,
+          logoUrl: '',
+          taxRegime: initial.tax_regime,
+          allowNegativeStock: false
+        });
       }
-      return res.status(200).json(data[0]);
+      
+      // MAPEAMENTO: Banco (snake_case) -> Frontend (camelCase)
+      const config = data[0];
+      return res.status(200).json({
+        companyName: config.company_name,
+        logoUrl: config.logo_url,
+        taxRegime: config.tax_regime,
+        allowNegativeStock: config.allow_negative_stock
+      });
     }
 
     if (req.method === 'POST') {
@@ -56,7 +56,6 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true });
     }
   } catch (error: any) {
-    console.error("Erro crítico na API de Config:", error);
     return res.status(500).json({ error: error.message });
   }
 }
