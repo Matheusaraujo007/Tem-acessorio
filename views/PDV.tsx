@@ -236,7 +236,7 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display">
       {/* HEADER PDV */}
-      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm">
+      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 relative" ref={menuRef}>
              <div 
@@ -244,7 +244,7 @@ const PDV: React.FC = () => {
                className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer group relative hover:scale-105 transition-all"
              >
                 {currentStore.logoUrl ? (
-                  <img src={currentStore.logoUrl} className="size-full object-cover" />
+                  <img src={currentStore.logoUrl} className="size-full object-cover" alt="Terminal Logo" />
                 ) : (
                   <span className="material-symbols-outlined">point_of_sale</span>
                 )}
@@ -300,7 +300,7 @@ const PDV: React.FC = () => {
       <main className="flex flex-1 overflow-hidden">
         {/* LADO ESQUERDO: LISTA DE PRODUTOS */}
         <section className="flex-1 flex flex-col">
-          <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+          <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
             <div className="relative">
                <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-2xl">search</span>
                <input 
@@ -310,23 +310,52 @@ const PDV: React.FC = () => {
                />
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start custom-scrollbar">
             {filteredProducts.map(p => (
-              <div key={p.id} onClick={() => addToCart(p)} className="bg-white dark:bg-slate-800 p-4 rounded-[2rem] border-2 border-transparent hover:border-primary transition-all cursor-pointer shadow-sm group relative overflow-hidden">
-                <div className={`aspect-square rounded-2xl mb-4 overflow-hidden flex items-center justify-center ${p.isService ? 'bg-amber-500/10' : 'bg-slate-100 dark:bg-slate-700'}`}>
+              <div 
+                key={p.id} 
+                onClick={() => addToCart(p)} 
+                className="bg-white dark:bg-slate-800 p-3 rounded-3xl border-2 border-transparent hover:border-primary transition-all cursor-pointer shadow-sm group relative flex flex-col h-fit"
+              >
+                {/* Badge de Categoria/Serviço */}
+                <div className="absolute top-4 left-4 z-10">
+                  <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter shadow-sm ${p.isService ? 'bg-amber-500 text-white' : 'bg-slate-900/60 text-white backdrop-blur-md'}`}>
+                    {p.isService ? 'Serviço' : p.category}
+                  </span>
+                </div>
+
+                {/* Badge de Estoque Crítico */}
+                {!p.isService && p.stock <= 5 && (
+                  <div className="absolute top-4 right-4 z-10 animate-pulse">
+                    <span className="bg-rose-500 text-white px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Crítico</span>
+                  </div>
+                )}
+
+                {/* Container Imagem com Proporção Fixa */}
+                <div className={`aspect-square w-full rounded-2xl mb-3 overflow-hidden flex items-center justify-center shrink-0 ${p.isService ? 'bg-amber-500/5' : 'bg-slate-100 dark:bg-slate-700'}`}>
                   {p.isService ? (
-                    <span className="material-symbols-outlined text-6xl text-amber-500">build</span>
+                    <span className="material-symbols-outlined text-4xl text-amber-500/50">build</span>
                   ) : (
-                    <img src={p.image} className="size-full object-cover group-hover:scale-110 transition-transform" />
+                    <img src={p.image} className="size-full object-cover group-hover:scale-110 transition-transform duration-500" alt={p.name} />
                   )}
                 </div>
-                <div>
-                   <h4 className="text-xs font-black uppercase truncate">{p.name}</h4>
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{p.isService ? 'Mão de Obra' : p.category}</p>
-                </div>
-                <div className="mt-3 flex justify-between items-end">
-                   <p className="text-lg font-black text-primary">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
-                   {!p.isService && <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${p.stock <= 5 ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'}`}>{p.stock} un</span>}
+
+                {/* Informações do Produto */}
+                <div className="flex flex-col flex-1 px-1">
+                   <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 line-clamp-2 min-h-[32px] leading-tight mb-1">{p.name}</h4>
+                   
+                   <div className="mt-auto flex justify-between items-end">
+                      <div className="flex flex-col">
+                        <span className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-1">{p.sku}</span>
+                      </div>
+                      {!p.isService && (
+                        <div className="text-right">
+                           <p className="text-[9px] font-black text-slate-400 uppercase">Estoque</p>
+                           <p className={`text-xs font-black leading-none ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock} <span className="text-[8px]">un</span></p>
+                        </div>
+                      )}
+                   </div>
                 </div>
               </div>
             ))}
@@ -334,7 +363,7 @@ const PDV: React.FC = () => {
         </section>
 
         {/* LADO DIREITO: CARRINHO E CHECKOUT */}
-        <aside className="w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl relative">
+        <aside className="w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl relative shrink-0">
           <div className="p-6 space-y-4 border-b border-slate-100 dark:border-slate-800">
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -383,7 +412,7 @@ const PDV: React.FC = () => {
              ))}
           </div>
 
-          <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
+          <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] shrink-0">
              <div className="space-y-2">
                 <div className="flex justify-between text-slate-500">
                    <span className="text-[10px] font-black uppercase">Subtotal Itens</span>
@@ -621,14 +650,14 @@ const PDV: React.FC = () => {
       {showStockInquiry && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[600px] animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-4">
                     <span className="material-symbols-outlined text-3xl">inventory_2</span>
                     <h3 className="text-2xl font-black uppercase tracking-tight">Consulta Rápida de Estoque</h3>
                  </div>
                  <button onClick={() => setShowStockInquiry(false)} className="size-10 hover:bg-white/20 rounded-xl"><span className="material-symbols-outlined">close</span></button>
               </div>
-              <div className="p-6 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800 shrink-0">
                  <input 
                    autoFocus
                    placeholder="Digite o nome ou bipe o código..." 
@@ -640,7 +669,7 @@ const PDV: React.FC = () => {
                  {products.filter(p => !p.isService && (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.includes(search))).map(p => (
                    <div key={p.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
                       <div className="flex items-center gap-4">
-                         <img src={p.image} className="size-12 rounded-xl object-cover" />
+                         <img src={p.image} className="size-12 rounded-xl object-cover" alt={p.name} />
                          <div>
                             <p className="text-xs font-black uppercase truncate">{p.name}</p>
                             <p className="text-[9px] font-mono text-slate-400 uppercase tracking-tighter">{p.sku} | {p.location || 'Sem loc.'}</p>
