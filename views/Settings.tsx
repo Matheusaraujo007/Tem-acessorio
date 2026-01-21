@@ -19,6 +19,10 @@ const Settings: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
   
+  // Estados para Aba de Permissões
+  const [selectedRolePerm, setSelectedRolePerm] = useState<UserRole>(UserRole.MANAGER);
+  const [localPerms, setLocalPerms] = useState<RolePermissions | null>(null);
+
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   const [userForm, setUserForm] = useState<Partial<User>>({
@@ -32,6 +36,13 @@ const Settings: React.FC = () => {
   useEffect(() => {
     setLocalConfig(systemConfig);
   }, [systemConfig]);
+
+  // Carrega permissões locais ao mudar o cargo selecionado
+  useEffect(() => {
+    if (rolePermissions[selectedRolePerm]) {
+      setLocalPerms({ ...rolePermissions[selectedRolePerm] });
+    }
+  }, [selectedRolePerm, rolePermissions]);
 
   const filteredUsers = users.filter(u => isAdmin || u.storeId === currentUser?.storeId);
   const filteredStores = establishments.filter(e => isAdmin || e.id === currentUser?.storeId);
@@ -68,6 +79,19 @@ const Settings: React.FC = () => {
     setShowStoreModal(false);
   };
 
+  const handleSavePermissions = async () => {
+    if (!localPerms) return;
+    setIsSaving(true);
+    try {
+      await updateRolePermissions(selectedRolePerm, localPerms);
+      alert(`Permissões para ${selectedRolePerm} atualizadas com sucesso!`);
+    } catch (e) {
+      alert("Erro ao salvar permissões");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSyncDB = async () => {
      if(confirm("Deseja forçar a sincronização de tabelas com o banco Neon? Isso garantirá que todas as colunas novas existam.")) {
         const res = await fetch('/api/init-db');
@@ -78,6 +102,11 @@ const Settings: React.FC = () => {
           alert("Erro ao sincronizar banco.");
         }
      }
+  };
+
+  const togglePerm = (key: keyof RolePermissions) => {
+    if (!localPerms) return;
+    setLocalPerms({ ...localPerms, [key]: !localPerms[key] });
   };
 
   return (
@@ -170,6 +199,55 @@ const Settings: React.FC = () => {
            </div>
         )}
 
+        {activeTab === 'permissions' && isAdmin && (
+          <div className="max-w-4xl space-y-8 animate-in slide-in-from-left-4">
+             <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
+                <div className="space-y-2">
+                   <h3 className="text-xl font-black uppercase tracking-tight">Configuração de Acessos</h3>
+                   <p className="text-xs font-bold text-slate-400 uppercase">Defina o que cada cargo pode visualizar e operar no sistema.</p>
+                </div>
+                
+                <div className="flex gap-2 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-2xl">
+                   {[UserRole.MANAGER, UserRole.CASHIER, UserRole.VENDOR].map(role => (
+                      <button 
+                        key={role} 
+                        onClick={() => setSelectedRolePerm(role)}
+                        className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${selectedRolePerm === role ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                         {role}
+                      </button>
+                   ))}
+                </div>
+
+                {localPerms && (
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {Object.keys(localPerms).map((key) => (
+                         <div key={key} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <div className="flex items-center gap-3">
+                               <div className={`size-8 rounded-lg flex items-center justify-center ${localPerms[key as keyof RolePermissions] ? 'bg-primary text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
+                                  <span className="material-symbols-outlined text-sm">{getIconForModule(key)}</span>
+                               </div>
+                               <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-300">{getLabelForModule(key)}</span>
+                            </div>
+                            <button 
+                              onClick={() => togglePerm(key as keyof RolePermissions)}
+                              className={`w-12 h-6 rounded-full relative transition-all ${localPerms[key as keyof RolePermissions] ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                            >
+                               <div className={`absolute top-1 size-4 bg-white rounded-full shadow-sm transition-all ${localPerms[key as keyof RolePermissions] ? 'right-1' : 'left-1'}`}></div>
+                            </button>
+                         </div>
+                      ))}
+                   </div>
+                )}
+
+                <button onClick={handleSavePermissions} disabled={isSaving} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-2">
+                   {isSaving ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">shield</span>}
+                   {isSaving ? 'Salvando...' : `Salvar Permissões para ${selectedRolePerm}`}
+                </button>
+             </div>
+          </div>
+        )}
+
         {activeTab === 'db' && isAdmin && (
            <div className="max-w-4xl space-y-8 animate-in slide-in-from-right-4">
               <div className="bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
@@ -239,6 +317,40 @@ const Settings: React.FC = () => {
       )}
     </div>
   );
+};
+
+const getLabelForModule = (key: string) => {
+  const labels: Record<string, string> = {
+    dashboard: 'Dashboard / Resumo',
+    pdv: 'Frente de Caixa (PDV)',
+    customers: 'Gestão de Clientes',
+    reports: 'Relatórios de Venda',
+    inventory: 'Catálogo de Produtos',
+    balance: 'Balanço de Estoque',
+    incomes: 'Controle de Receitas',
+    expenses: 'Controle de Despesas',
+    financial: 'DRE / Resultado',
+    settings: 'Configurações Sistema',
+    serviceOrders: 'Ordens de Serviço'
+  };
+  return labels[key] || key;
+};
+
+const getIconForModule = (key: string) => {
+  const icons: Record<string, string> = {
+    dashboard: 'dashboard',
+    pdv: 'point_of_sale',
+    customers: 'groups',
+    reports: 'monitoring',
+    inventory: 'inventory_2',
+    balance: 'inventory',
+    incomes: 'payments',
+    expenses: 'money_off',
+    financial: 'account_balance',
+    settings: 'settings',
+    serviceOrders: 'build'
+  };
+  return icons[key] || 'label';
 };
 
 const TabButton: React.FC<{ active: boolean; onClick: () => void; icon: string; label: string }> = ({ active, onClick, icon, label }) => (
