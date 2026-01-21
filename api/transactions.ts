@@ -16,6 +16,7 @@ export default async function handler(req: any, res: any) {
       category: t.category,
       status: t.status,
       value: Number(t.value),
+      shippingValue: Number(t.shipping_value || 0),
       type: t.type,
       method: t.method,
       client: t.client,
@@ -34,11 +35,11 @@ export default async function handler(req: any, res: any) {
     try {
       await sql`
         INSERT INTO transactions (
-          id, date, due_date, description, store, category, status, value, type, method, 
+          id, date, due_date, description, store, category, status, value, shipping_value, type, method, 
           client, client_id, vendor_id, items, installments, auth_number, transaction_sku
         )
         VALUES (
-          ${t.id}, ${t.date}, ${t.dueDate}, ${t.description}, ${t.store}, ${t.category}, ${t.status}, ${t.value}, ${t.type}, ${t.method}, 
+          ${t.id}, ${t.date}, ${t.dueDate}, ${t.description}, ${t.store}, ${t.category}, ${t.status}, ${t.value}, ${t.shippingValue || 0}, ${t.type}, ${t.method}, 
           ${t.client}, ${t.clientId}, ${t.vendorId}, ${JSON.stringify(t.items)}, ${t.installments || null}, ${t.authNumber || null}, ${t.transactionSku || null}
         )
       `;

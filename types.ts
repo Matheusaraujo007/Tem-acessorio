@@ -13,7 +13,7 @@ export interface Product {
   unit?: string;
   weight?: string;
   location?: string;
-  isService?: boolean; // Define se é um serviço (mão de obra) ou produto
+  isService?: boolean;
 }
 
 export interface CartItem extends Product {
@@ -24,7 +24,7 @@ export enum TransactionStatus {
   PAID = 'PAGO',
   PENDING = 'PENDENTE',
   OVERDUE = 'ATRASADO',
-  APPROVED = 'APROVADO'
+  APPROVED = 'ATRASADO'
 }
 
 export enum ServiceOrderStatus {
@@ -57,6 +57,7 @@ export interface Transaction {
   category: string;
   status: TransactionStatus;
   value: number;
+  shippingValue?: number;
   type: 'INCOME' | 'EXPENSE';
   method?: string;
   client?: string;
@@ -108,6 +109,15 @@ export interface Customer {
   email: string;
   phone: string;
   birthDate: string;
+  cpfCnpj?: string;
+  zipCode?: string;
+  address?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  notes?: string;
 }
 
 export interface Establishment {
@@ -117,6 +127,7 @@ export interface Establishment {
   location: string;
   hasStockAccess: boolean;
   active: boolean;
+  logoUrl?: string;
 }
 
 export interface DRERow {

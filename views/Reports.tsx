@@ -30,7 +30,6 @@ const Reports: React.FC = () => {
   const commissionData = useMemo(() => {
     const totals: Record<string, { user: User; totalSales: number; commission: number }> = {};
     
-    // Inicializa quem ganha comissão
     users.filter(u => u.commissionActive).forEach(u => {
       totals[u.id] = { user: u, totalSales: 0, commission: 0 };
     });
@@ -38,8 +37,10 @@ const Reports: React.FC = () => {
     periodSales.forEach(sale => {
       if (sale.vendorId && totals[sale.vendorId]) {
         const rate = totals[sale.vendorId].user.commissionRate || 0;
-        totals[sale.vendorId].totalSales += sale.value;
-        totals[sale.vendorId].commission += (sale.value * (rate / 100));
+        // BASE DE CÁLCULO: Valor da Venda - Frete
+        const baseValue = sale.value - (sale.shippingValue || 0);
+        totals[sale.vendorId].totalSales += baseValue;
+        totals[sale.vendorId].commission += (baseValue * (rate / 100));
       }
     });
 
@@ -59,6 +60,7 @@ const Reports: React.FC = () => {
   }, [periodSales]);
 
   const totalRevenue = periodSales.reduce((acc, t) => acc + t.value, 0);
+  const totalShipping = periodSales.reduce((acc, t) => acc + (t.shippingValue || 0), 0);
   const globalAverageTicket = periodSales.length > 0 ? totalRevenue / periodSales.length : 0;
 
   return (
@@ -85,8 +87,8 @@ const Reports: React.FC = () => {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <ReportKPICard title="Ticket Médio" value={`R$ ${globalAverageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="payments" color="text-primary" />
-            <ReportKPICard title="Vendas Período" value={periodSales.length.toString()} icon="shopping_bag" color="text-rose-500" />
             <ReportKPICard title="Faturamento Bruto" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="trending_up" color="text-amber-500" />
+            <ReportKPICard title="Total Fretes" value={`R$ ${totalShipping.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="local_shipping" color="text-rose-500" />
             <ReportKPICard title="Itens Vendidos" value={periodSales.reduce((acc, t) => acc + (t.items?.reduce((a,i) => a+i.quantity, 0) || 0), 0).toString()} icon="inventory" color="text-primary" />
           </div>
 
@@ -109,7 +111,6 @@ const Reports: React.FC = () => {
                   ))}
               </div>
             </div>
-            {/* Outros componentes de vendas aqui... */}
           </div>
         </>
       ) : (
@@ -118,7 +119,7 @@ const Reports: React.FC = () => {
               <div className="size-16 bg-emerald-500 text-white rounded-3xl flex items-center justify-center shadow-lg"><span className="material-symbols-outlined text-3xl">payments</span></div>
               <div>
                  <h4 className="text-lg font-black text-emerald-800 dark:text-emerald-400 uppercase leading-none">Gestão de Comissões</h4>
-                 <p className="text-xs font-bold text-emerald-700/60 dark:text-emerald-400/60 uppercase mt-1">Valores calculados com base nas vendas do período selecionado ({period} dias).</p>
+                 <p className="text-xs font-bold text-emerald-700/60 dark:text-emerald-400/60 uppercase mt-1">Valores calculados sobre o subtotal (Fretes e Serviços de entrega desconsiderados).</p>
               </div>
            </div>
 
@@ -127,7 +128,7 @@ const Reports: React.FC = () => {
                  <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                        <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Colaborador</th>
-                       <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Volume de Vendas</th>
+                       <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Volume Comissionável</th>
                        <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Taxa (%)</th>
                        <th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Comissão a Pagar</th>
                     </tr>

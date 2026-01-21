@@ -7,6 +7,7 @@ interface SystemConfig {
   logoUrl?: string;
   taxRegime: string;
   allowNegativeStock: boolean;
+  returnPeriodDays: number;
 }
 
 interface AppContextType {
@@ -36,7 +37,7 @@ interface AppContextType {
   deleteUser: (id: string) => Promise<void>;
   addEstablishment: (e: Establishment) => Promise<void>;
   deleteEstablishment: (id: string) => Promise<void>;
-  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => Promise<void>;
+  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue?: number, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string }) => Promise<void>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -44,7 +45,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Usuário padrão para acesso sem login
 const DEFAULT_USER: User = {
   id: 'admin-01',
   name: 'Administrador Sistema',
@@ -67,7 +67,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [rolePermissions, setRolePermissions] = useState<Record<UserRole, RolePermissions>>(INITIAL_PERMS);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
-    companyName: 'Retail Cloud ERP', logoUrl: '', taxRegime: 'Simples Nacional', allowNegativeStock: false
+    companyName: 'Retail Cloud ERP', logoUrl: '', taxRegime: 'Simples Nacional', allowNegativeStock: false, returnPeriodDays: 30
   });
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,7 +111,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   useEffect(() => {
-    // Tenta inicializar o banco se estiver vazio no primeiro acesso
     fetch('/api/init-db').finally(() => refreshData());
   }, []);
 
@@ -138,10 +137,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
-  const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, cardDetails?: any) => {
+  const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue: number = 0, cardDetails?: any) => {
     for (const item of items) {
        const p = products.find(x => x.id === item.id);
-       if (p) await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
+       if (p && !p.isService) await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
     }
 
     const client = customers.find(c => c.id === clientId);
@@ -153,6 +152,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       category: 'Venda',
       status: TransactionStatus.PAID,
       value: total,
+      shippingValue: shippingValue,
       type: 'INCOME',
       method,
       clientId,

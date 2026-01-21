@@ -4,13 +4,19 @@ import { useApp } from '../AppContext';
 import { useNavigate } from 'react-router-dom';
 
 const Login: React.FC = () => {
-  const { login, systemConfig, refreshData } = useApp();
+  const { login, systemConfig, refreshData, users, addUser } = useApp();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  // Estados Reset Senha
+  const [resetEmail, setResetEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +47,31 @@ const Login: React.FC = () => {
       alert("Erro de conexão com o servidor.");
     } finally {
       setSetupLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert("As senhas não conferem!");
+      return;
+    }
+    
+    const user = users.find(u => u.email.toLowerCase() === resetEmail.toLowerCase());
+    if (!user) {
+      alert("Usuário não localizado no sistema!");
+      return;
+    }
+
+    try {
+      await addUser({ ...user, password: newPassword });
+      alert("Senha alterada com sucesso! Tente realizar o login.");
+      setShowResetModal(false);
+      setResetEmail('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e) {
+      alert("Erro ao redefinir senha.");
     }
   };
 
@@ -87,7 +118,10 @@ const Login: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Senha de Acesso</label>
+              <div className="flex justify-between items-center px-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Senha de Acesso</label>
+                <button type="button" onClick={() => setShowResetModal(true)} className="text-[9px] font-black text-primary uppercase hover:underline">Esqueci Senha</button>
+              </div>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">lock</span>
                 <input 
@@ -130,6 +164,33 @@ const Login: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* MODAL RESET SENHA */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+             <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center">
+                <h3 className="text-xl font-black uppercase tracking-tight">Recuperar Senha</h3>
+                <button onClick={() => setShowResetModal(false)}><span className="material-symbols-outlined">close</span></button>
+             </div>
+             <form onSubmit={handleResetPassword} className="p-10 space-y-5">
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirme seu E-mail</label>
+                   <input required value={resetEmail} onChange={e => setResetEmail(e.target.value)} type="email" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" placeholder="Ex: joao@empresa.com" />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nova Senha</label>
+                   <input required value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" underline className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" placeholder="••••••••" />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirmar Nova Senha</label>
+                   <input required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} type="password" underline className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" placeholder="••••••••" />
+                </div>
+                <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl">Alterar Senha Agora</button>
+             </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

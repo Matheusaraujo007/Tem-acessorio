@@ -13,7 +13,8 @@ export default async function handler(req: any, res: any) {
       cnpj: e.cnpj,
       location: e.location,
       hasStockAccess: e.has_stock_access,
-      active: e.active
+      active: e.active,
+      logoUrl: e.logo_url
     }));
     return res.status(200).json(mapped);
   }
@@ -22,14 +23,15 @@ export default async function handler(req: any, res: any) {
     const e = req.body;
     try {
       await sql`
-        INSERT INTO establishments (id, name, cnpj, location, has_stock_access, active)
-        VALUES (${e.id}, ${e.name}, ${e.cnpj || ''}, ${e.location || ''}, ${e.hasStockAccess !== undefined ? e.hasStockAccess : true}, ${e.active !== undefined ? e.active : true})
+        INSERT INTO establishments (id, name, cnpj, location, has_stock_access, active, logo_url)
+        VALUES (${e.id}, ${e.name}, ${e.cnpj || ''}, ${e.location || ''}, ${e.hasStockAccess !== undefined ? e.hasStockAccess : true}, ${e.active !== undefined ? e.active : true}, ${e.logoUrl || null})
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
           cnpj = EXCLUDED.cnpj,
           location = EXCLUDED.location,
           has_stock_access = EXCLUDED.has_stock_access,
-          active = EXCLUDED.active
+          active = EXCLUDED.active,
+          logo_url = EXCLUDED.logo_url
       `;
       return res.status(200).json({ success: true });
     } catch (err: any) {

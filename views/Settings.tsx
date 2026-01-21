@@ -29,7 +29,6 @@ const Settings: React.FC = () => {
     name: '', cnpj: '', location: '', hasStockAccess: true, active: true
   });
 
-  // Atualiza o localConfig sempre que o global systemConfig mudar (ex: após refreshData)
   useEffect(() => {
     setLocalConfig(systemConfig);
   }, [systemConfig]);
@@ -41,7 +40,6 @@ const Settings: React.FC = () => {
     setIsSaving(true);
     try {
       await updateConfig(localConfig);
-      // O refreshData dentro do updateConfig já cuidará de atualizar o estado global
     } catch (e) {
       alert("Erro ao salvar configurações");
     } finally {
@@ -105,10 +103,16 @@ const Settings: React.FC = () => {
                    <div className="size-32 bg-slate-50 dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
                       {localConfig.logoUrl ? <img src={localConfig.logoUrl} className="size-full object-contain" /> : <span className="material-symbols-outlined text-4xl text-slate-300">image</span>}
                    </div>
-                   <div className="flex-1 space-y-4">
-                      <div className="space-y-1">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Comercial</label>
-                         <input type="text" value={localConfig.companyName} onChange={e => setLocalConfig({...localConfig, companyName: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black text-sm border-none outline-none focus:ring-2 focus:ring-primary uppercase" />
+                   <div className="flex-1 space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Comercial</label>
+                           <input type="text" value={localConfig.companyName} onChange={e => setLocalConfig({...localConfig, companyName: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black text-sm border-none outline-none focus:ring-2 focus:ring-primary uppercase" />
+                        </div>
+                        <div className="space-y-1">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Prazo para Troca (Dias)</label>
+                           <input type="number" value={localConfig.returnPeriodDays} onChange={e => setLocalConfig({...localConfig, returnPeriodDays: parseInt(e.target.value) || 30})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black text-sm border-none outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
                       </div>
                       <button onClick={() => logoInputRef.current?.click()} className="text-[10px] font-black text-primary uppercase underline">Subir Logotipo</button>
                       <input type="file" ref={logoInputRef} className="hidden" onChange={e => {
@@ -123,13 +127,12 @@ const Settings: React.FC = () => {
                 </div>
                 <button onClick={handleSaveConfig} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-2">
                   {isSaving ? <span className="material-symbols-outlined animate-spin">sync</span> : null}
-                  {isSaving ? 'Salvando...' : 'Atualizar Empresa'}
+                  {isSaving ? 'Salvando...' : 'Atualizar Configurações'}
                 </button>
              </div>
           </div>
         )}
 
-        {/* Mantém as outras abas inalteradas conforme solicitado */}
         {activeTab === 'users' && (
            <div className="space-y-6">
               <div className="flex justify-between items-center px-4">
@@ -185,7 +188,6 @@ const Settings: React.FC = () => {
         )}
       </div>
 
-      {/* Modais de Usuário e Loja mantidos conforme o código original */}
       {showUserModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
