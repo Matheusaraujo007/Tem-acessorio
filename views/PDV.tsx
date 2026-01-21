@@ -12,7 +12,7 @@ const PDV: React.FC = () => {
   // Modais e Menus
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOSModal, setShowOSModal] = useState(false);
-  const [showStockInquiry, setShowStockInquiry] = useState(false);
+  const [showPriceInquiry, setShowPriceInquiry] = useState(false);
   const [showReturnsModal, setShowReturnsModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -373,8 +373,8 @@ const PDV: React.FC = () => {
            <button onClick={() => setShowReturnsModal(true)} className="px-6 py-2.5 bg-amber-500/10 text-amber-600 rounded-xl font-black text-xs hover:bg-amber-500 hover:text-white transition-all uppercase flex items-center gap-2">
              <span className="material-symbols-outlined text-lg">history</span> Trocas
            </button>
-           <button onClick={() => setShowStockInquiry(true)} className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-xs hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2">
-             <span className="material-symbols-outlined text-lg">inventory_2</span> Estoque
+           <button onClick={() => setShowPriceInquiry(true)} className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-xs hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2">
+             <span className="material-symbols-outlined text-lg">sell</span> Consulta Preço
            </button>
            <button onClick={() => window.history.back()} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-black transition-all uppercase tracking-widest">Sair</button>
         </div>
@@ -633,18 +633,39 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {showStockInquiry && (
+      {showPriceInquiry && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 bg-primary text-white flex justify-between items-center"><h3 className="text-2xl font-black uppercase">Consulta Estoque</h3><button onClick={() => setShowStockInquiry(false)} className="size-10 hover:bg-white/20 rounded-xl"><span className="material-symbols-outlined">close</span></button></div>
-              <div className="p-6 bg-slate-50 dark:bg-slate-800 shrink-0"><input autoFocus placeholder="Digite o nome..." className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl px-6 text-sm font-bold shadow-sm" onChange={e => setSearch(e.target.value)} /></div>
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[70vh] flex flex-col">
+              <div className="p-8 bg-primary text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-3xl">sell</span>
+                  <h3 className="text-2xl font-black uppercase">Consulta Preço</h3>
+                </div>
+                <button onClick={() => setShowPriceInquiry(false)} className="size-10 hover:bg-white/20 rounded-xl"><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 shrink-0">
+                <input autoFocus placeholder="Digite o nome, SKU ou Código de Barras..." className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl px-6 text-sm font-bold shadow-sm" onChange={e => setSearch(e.target.value)} />
+              </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                 {products.filter(p => !p.isService && (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.includes(search))).map(p => (
-                   <div key={p.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border">
-                      <div className="flex items-center gap-4"><img src={p.image} className="size-12 rounded-xl object-cover" alt={p.name} /><div><p className="text-xs font-black uppercase truncate">{p.name}</p><p className="text-[9px] font-mono text-slate-400 uppercase">{p.sku}</p></div></div>
-                      <div className="text-right"><p className={`text-xl font-black ${p.stock <= 5 ? 'text-rose-500' : 'text-primary'}`}>{p.stock} un</p></div>
+                 {products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.includes(search)))).map(p => (
+                   <div key={p.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-primary/50 transition-all">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <img src={p.image} className="size-14 rounded-xl object-cover shrink-0" alt={p.name} />
+                        <div className="truncate">
+                          <p className="text-xs font-black uppercase truncate text-slate-700 dark:text-slate-200">{p.name}</p>
+                          <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">{p.sku}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-emerald-500 tabular-nums leading-none">R$ {p.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        {!p.isService && <p className={`text-[10px] font-black uppercase mt-1 ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-400'}`}>Estoque: {p.stock} un</p>}
+                        {p.isService && <p className="text-[10px] font-black uppercase mt-1 text-amber-500">Serviço</p>}
+                      </div>
                    </div>
                  ))}
+                 {search && products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.includes(search)))).length === 0 && (
+                   <div className="text-center py-10 opacity-20 uppercase font-black text-xs tracking-widest">Nenhum produto localizado</div>
+                 )}
               </div>
            </div>
         </div>
