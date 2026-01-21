@@ -381,8 +381,16 @@ const PDV: React.FC = () => {
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
              {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center opacity-20"><span className="material-symbols-outlined text-7xl">shopping_cart</span><p className="text-xs font-black uppercase mt-4">Vazio</p></div> : cart.map(item => (
-               <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group">
-                  <div className={`size-14 rounded-2xl flex items-center justify-center shrink-0 ${item.isService ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}><span className="material-symbols-outlined">{item.isService ? 'build' : 'shopping_bag'}</span></div>
+               <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group border border-transparent hover:border-primary/20 transition-all">
+                  <div className={`size-14 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden ${item.isService ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                    {item.image && !item.isService ? (
+                      <img src={item.image} className="size-full object-cover" alt={item.name} />
+                    ) : item.isService ? (
+                       <span className="material-symbols-outlined">build</span>
+                    ) : (
+                       <span className="material-symbols-outlined">shopping_bag</span>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                      <p className="text-xs font-black uppercase truncate leading-none">{item.name}</p>
                      <div className="flex justify-between items-center mt-2">
