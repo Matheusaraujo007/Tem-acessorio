@@ -40,6 +40,7 @@ const ServiceOrders: React.FC = () => {
 
   const handleUpdateStatus = (os: ServiceOrder, newStatus: ServiceOrderStatus) => {
     if (newStatus === ServiceOrderStatus.FINISHED) {
+      setSelectedOS(os);
       setShowPaymentModal(true);
       return;
     }
@@ -50,28 +51,32 @@ const ServiceOrders: React.FC = () => {
   const handleFinalizeAndPay = async () => {
     if (!selectedOS) return;
     
-    // 1. Criar Transação Financeira
-    await addTransaction({
-      id: `PAY-OS-${selectedOS.id}`,
-      date: new Date().toISOString().split('T')[0],
-      description: `Recebimento de Serviço (OS: ${selectedOS.id})`,
-      store: selectedOS.store,
-      category: 'Serviço',
-      status: TransactionStatus.PAID,
-      value: selectedOS.totalValue,
-      type: 'INCOME',
-      method: paymentMethod,
-      client: selectedOS.customerName,
-      clientId: selectedOS.customerId,
-      items: selectedOS.items
-    });
+    try {
+      // 1. Criar Transação Financeira
+      await addTransaction({
+        id: `PAY-OS-${Date.now()}`,
+        date: new Date().toISOString().split('T')[0],
+        description: `Recebimento de OS #${selectedOS.id}`,
+        store: selectedOS.store,
+        category: 'Serviço',
+        status: TransactionStatus.PAID,
+        value: selectedOS.totalValue,
+        type: 'INCOME',
+        method: paymentMethod,
+        client: selectedOS.customerName,
+        clientId: selectedOS.customerId,
+        items: selectedOS.items
+      });
 
-    // 2. Atualizar Status da OS
-    const updated = { ...selectedOS, status: ServiceOrderStatus.FINISHED };
-    await updateServiceOrder(updated);
-    setSelectedOS(updated);
-    setShowPaymentModal(false);
-    alert('Ordem de Serviço finalizada e pagamento registrado com sucesso!');
+      // 2. Atualizar Status da OS
+      const updated = { ...selectedOS, status: ServiceOrderStatus.FINISHED };
+      await updateServiceOrder(updated);
+      setSelectedOS(updated);
+      setShowPaymentModal(false);
+      alert('Ordem de Serviço finalizada e pagamento registrado com sucesso!');
+    } catch (e) {
+      alert("Erro ao processar recebimento.");
+    }
   };
 
   const handleSaveService = async (e: React.FormEvent) => {
@@ -234,7 +239,7 @@ const ServiceOrders: React.FC = () => {
 
       {/* MODAL DETALHADO DA OS */}
       {selectedOS && !showPaymentModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[700px]">
               <div className="w-full md:w-[350px] bg-slate-50 dark:bg-slate-800/50 p-10 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                  <div className="space-y-8">
@@ -247,13 +252,17 @@ const ServiceOrders: React.FC = () => {
                     </div>
                     {selectedOS.status !== ServiceOrderStatus.FINISHED && (
                       <div className="space-y-4 pt-8 border-t border-slate-200 dark:border-slate-700">
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alterar Status</p>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações Rápidas</p>
                          <div className="grid grid-cols-1 gap-2">
-                            {[ServiceOrderStatus.IN_PROGRESS, ServiceOrderStatus.FINISHED, ServiceOrderStatus.CANCELLED].map(s => (
-                               <button key={s} onClick={() => handleUpdateStatus(selectedOS, s as ServiceOrderStatus)} className={`w-full py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all shadow-sm ${s === ServiceOrderStatus.FINISHED ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : 'bg-white dark:bg-slate-900 border-transparent hover:border-primary'}`}>
-                                 {s === ServiceOrderStatus.FINISHED ? 'Concluir e Receber' : `Mudar para ${s}`}
-                               </button>
-                            ))}
+                            <button onClick={() => handleUpdateStatus(selectedOS, ServiceOrderStatus.FINISHED)} className="w-full py-3 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase border-2 border-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/10 transition-all">
+                               Concluir e Receber
+                            </button>
+                            <button onClick={() => handleUpdateStatus(selectedOS, ServiceOrderStatus.IN_PROGRESS)} className="w-full py-3 bg-white dark:bg-slate-900 text-primary rounded-xl text-[9px] font-black uppercase border-2 border-primary/20 hover:border-primary transition-all">
+                               Iniciar Execução
+                            </button>
+                            <button onClick={() => handleUpdateStatus(selectedOS, ServiceOrderStatus.CANCELLED)} className="w-full py-3 bg-white dark:bg-slate-900 text-rose-500 rounded-xl text-[9px] font-black uppercase border-2 border-rose-500/20 hover:border-rose-500 transition-all">
+                               Cancelar Ordem
+                            </button>
                          </div>
                       </div>
                     )}
