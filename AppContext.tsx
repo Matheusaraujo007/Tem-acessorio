@@ -120,7 +120,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  const logout = () => setCurrentUser(DEFAULT_USER);
+  const logout = () => setCurrentUser(null);
 
   const addServiceOrder = async (os: ServiceOrder) => {
     await fetch('/api/service-orders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(os)});
@@ -138,17 +138,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue: number = 0, cardDetails?: any) => {
+    // 1. Atualiza estoque de produtos físicos
     for (const item of items) {
        const p = products.find(x => x.id === item.id);
-       if (p && !p.isService) await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
+       if (p && !p.isService) {
+         await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
+       }
     }
 
+    // 2. Localiza nomes para transação
     const client = customers.find(c => c.id === clientId);
+    const storeObj = establishments.find(e => e.id === currentUser?.storeId);
+
+    // 3. Cria a transação de entrada
     await addTransaction({
       id: `SALE-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       description: `Venda PDV`,
-      store: establishments.find(e => e.id === currentUser?.storeId)?.name || 'Principal',
+      store: storeObj?.name || 'Unidade Local',
       category: 'Venda',
       status: TransactionStatus.PAID,
       value: total,
@@ -161,6 +168,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       items,
       ...cardDetails
     });
+    
+    await refreshData();
+  };
+
+  const bulkUpdateStock = async (adjustments: Record<string, number>) => {
+    for (const [id, newStock] of Object.entries(adjustments)) {
+      const p = products.find(x => x.id === id);
+      if (p) {
+        await addProduct({ ...p, stock: newStock });
+      }
+    }
     await refreshData();
   };
 
@@ -168,7 +186,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{ 
       currentUser, systemConfig, rolePermissions, products, transactions, customers, users, serviceOrders, establishments, loading, login, logout, 
       addProduct, updateProduct: addProduct, deleteProduct: (id) => {}, addTransaction, addCustomer, addUser, updateSelf: addUser, addServiceOrder, updateServiceOrder,
-      deleteUser: (id) => {}, addEstablishment, deleteEstablishment: (id) => {}, processSale, updateStock: (id, q) => {}, bulkUpdateStock: (a) => {}, refreshData,
+      deleteUser: (id) => {}, addEstablishment, deleteEstablishment: (id) => {}, processSale, updateStock: (id, q) => {}, bulkUpdateStock, refreshData,
       updateConfig: async (conf) => { await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(conf)}); refreshData(); }, 
       updateRolePermissions: async (role, perms) => { await fetch('/api/permissions', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({role, permissions: perms})}); refreshData(); }
     }}>

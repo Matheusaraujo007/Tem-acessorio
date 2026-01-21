@@ -32,7 +32,7 @@ const PDV: React.FC = () => {
   const [osDescription, setOsDescription] = useState('');
   const [osTechnician, setOsTechnician] = useState('');
 
-  // Novos campos
+  // Financeiro
   const [shippingValue, setShippingValue] = useState(0);
 
   // Estados Troca/Devolução/Cancelamento
@@ -114,6 +114,7 @@ const PDV: React.FC = () => {
       const vendor = vendors.find(v => v.id === selectedVendorId);
       const customer = customers.find(c => c.id === selectedCustomerId);
       
+      // Salva dados para o recibo antes de limpar
       setLastSaleData({
         id: saleId,
         items: [...cart],
@@ -126,13 +127,17 @@ const PDV: React.FC = () => {
         customer: customer?.name || 'Consumidor Final'
       });
 
+      // Processa no banco Neon
       await processSale(cart, totalGeral, paymentMethod, selectedCustomerId, selectedVendorId, shippingValue);
+      
+      // Limpa PDV
       setCart([]);
       setShippingValue(0);
       setSuccessType('SALE');
       setShowCheckout(false);
       setShowSuccessModal(true);
     } catch (e) {
+      console.error(e);
       alert("Erro ao processar venda.");
     }
   };
@@ -217,9 +222,8 @@ const PDV: React.FC = () => {
     }
   };
 
-  // Lógica de Cancelamento de Venda
   const handleCancelSale = async (sale: Transaction) => {
-    if (confirm(`DESEJA REALMENTE CANCELAR A VENDA ${sale.id}?\n\nOs itens retornarão ao estoque e o valor de R$ ${sale.value.toLocaleString('pt-BR')} será estornado do caixa como uma despesa de cancelamento.`)) {
+    if (confirm(`DESEJA REALMENTE CANCELAR A VENDA ${sale.id}?\n\nOs itens retornarão ao estoque e o valor de R$ ${sale.value.toLocaleString('pt-BR')} será estornado do caixa.`)) {
       try {
         if (sale.items) {
           for (const item of sale.items) {
@@ -285,25 +289,46 @@ const PDV: React.FC = () => {
     }
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser) return;
-    if (newPass !== confirmPass) { alert("As senhas não conferem!"); return; }
-    if (newPass.length < 4) { alert("A senha deve ter pelo menos 4 caracteres!"); return; }
-    try {
-      await addUser({ ...currentUser, password: newPass });
-      alert("Senha atualizada com sucesso!");
-      setShowPasswordModal(false);
-      setNewPass('');
-      setConfirmPass('');
-    } catch (error) {
-      alert("Erro ao atualizar senha.");
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display">
-      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0">
+      
+      {/* COMPONENTE DE IMPRESSÃO (ESCONDIDO NA TELA) */}
+      <div id="receipt-print" className="hidden print:block p-4 text-slate-900 bg-white w-[80mm] font-mono text-[10px]">
+         <div className="text-center mb-4">
+            <h2 className="text-sm font-bold uppercase">{currentStore.name}</h2>
+            <p>{currentStore.location}</p>
+            <p>CNPJ: {currentStore.cnpj}</p>
+            <div className="border-b border-dashed border-slate-300 my-2"></div>
+            <h3 className="font-bold uppercase">Recibo de Venda</h3>
+            <p>#{lastSaleData?.id}</p>
+         </div>
+         <div className="space-y-1">
+            <p>DATA: {lastSaleData?.date}</p>
+            <p>VEND: {lastSaleData?.vendor}</p>
+            <p>CLI: {lastSaleData?.customer}</p>
+            <div className="border-b border-dashed border-slate-300 my-2"></div>
+            <div className="flex justify-between font-bold">
+               <span>DESCRIÇÃO</span>
+               <span>TOTAL</span>
+            </div>
+            {lastSaleData?.items.map((item: any, i: number) => (
+               <div key={i} className="flex justify-between">
+                  <span>{item.quantity}x {item.name.substring(0, 15)}</span>
+                  <span>R$ {(item.quantity * item.salePrice).toFixed(2)}</span>
+               </div>
+            ))}
+            <div className="border-b border-dashed border-slate-300 my-2"></div>
+            <div className="flex justify-between"><span>SUBTOTAL:</span><span>R$ {lastSaleData?.subtotal.toFixed(2)}</span></div>
+            {lastSaleData?.shipping > 0 && <div className="flex justify-between"><span>FRETE:</span><span>R$ {lastSaleData?.shipping.toFixed(2)}</span></div>}
+            <div className="flex justify-between font-bold text-sm"><span>TOTAL GERAL:</span><span>R$ {lastSaleData?.total.toFixed(2)}</span></div>
+            <p className="mt-2 uppercase">PAGAMENTO: {lastSaleData?.payment}</p>
+            <div className="border-b border-dashed border-slate-300 my-2"></div>
+            <p className="text-center mt-4">OBRIGADO PELA PREFERÊNCIA!</p>
+            <p className="text-center text-[8px] opacity-50">Retail Cloud ERP - Recibo não fiscal</p>
+         </div>
+      </div>
+
+      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0 print:hidden">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 relative" ref={menuRef}>
              <div onClick={() => setShowTerminalMenu(!showTerminalMenu)} className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer group relative hover:scale-105 transition-all">
@@ -313,9 +338,6 @@ const PDV: React.FC = () => {
                <div className="absolute top-14 left-0 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-3 z-[100] animate-in slide-in-from-top-2 duration-200">
                   <button onClick={() => logoInputRef.current?.click()} className="w-full px-4 py-3 flex items-center gap-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left uppercase">
                     <span className="material-symbols-outlined text-lg text-primary">add_a_photo</span> Alterar Logotipo
-                  </button>
-                  <button onClick={() => { setShowPasswordModal(true); setShowTerminalMenu(false); }} className="w-full px-4 py-3 flex items-center gap-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left uppercase">
-                    <span className="material-symbols-outlined text-lg text-amber-500">lock_reset</span> Alterar Minha Senha
                   </button>
                </div>
              )}
@@ -349,7 +371,7 @@ const PDV: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex flex-1 overflow-hidden print:hidden">
         <section className="flex-1 flex flex-col">
           <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
             <div className="relative">
@@ -369,7 +391,6 @@ const PDV: React.FC = () => {
                    <div className="mt-auto flex justify-between items-end">
                       <div className="flex flex-col"><span className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR')}</span></div>
                       {!p.isService && <div className="text-right"><p className={`text-xs font-black leading-none ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock} <span className="text-[8px]">un</span></p></div>}
-                      {p.isService && <div className="text-right"><p className="text-[10px] font-black text-amber-500 uppercase">Mão de Obra</p></div>}
                    </div>
                 </div>
               </div>
@@ -436,6 +457,87 @@ const PDV: React.FC = () => {
         </aside>
       </main>
 
+      {/* MODAL CHECKOUT (Onde a venda é finalizada) */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-10 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">Pagamento</h3><p className="text-[10px] font-black text-slate-400 uppercase mt-1">Selecione o método</p></div>
+                 <button onClick={() => setShowCheckout(false)} className="size-12 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center"><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-10 space-y-10">
+                 <div className="grid grid-cols-2 gap-4">
+                    {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => (
+                      <button key={m} onClick={() => setPaymentMethod(m)} className={`p-8 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${paymentMethod === m ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/50'}`}>
+                        <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
+                      </button>
+                    ))}
+                 </div>
+                 <div className="text-center bg-slate-50 dark:bg-slate-800 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800"><p className="text-5xl font-black text-primary tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</p></div>
+                 <button onClick={handleFinalizeSale} className="w-full h-20 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[2.5rem] font-black text-sm uppercase shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4">CONCLUIR VENDA</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL SUCESSO (Venda, OS, Devolução) */}
+      {showSuccessModal && (
+        <div className={`fixed inset-0 z-[500] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : successType === 'RETURN' ? 'bg-amber-600' : successType === 'CANCEL' ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+           <div className="text-center text-white space-y-8 animate-in zoom-in-50 duration-500 print:hidden">
+              <span className="material-symbols-outlined text-[160px] animate-bounce">
+                {successType === 'OS' ? 'build' : successType === 'RETURN' ? 'assignment_return' : successType === 'CANCEL' ? 'cancel' : 'check_circle'}
+              </span>
+              <div className="space-y-2">
+                 <h2 className="text-5xl font-black uppercase tracking-tighter">
+                   {successType === 'OS' ? 'Ordem Gerada!' : successType === 'RETURN' ? 'Devolução Concluída!' : successType === 'CANCEL' ? 'Venda Cancelada!' : 'Venda Concluída!'}
+                 </h2>
+                 <p className="text-xl font-bold uppercase opacity-60">Operação processada com sucesso.</p>
+              </div>
+              <div className="flex flex-col gap-4 max-w-sm mx-auto">
+                 {successType === 'SALE' && (
+                    <button onClick={printReceipt} className="w-full py-5 bg-white text-emerald-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3">
+                       <span className="material-symbols-outlined">print</span> IMPRIMIR RECIBO
+                    </button>
+                 )}
+                 <button onClick={() => setShowSuccessModal(false)} className="w-full py-5 bg-black/20 text-white border border-white/20 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black/30 transition-all">Continuar Operando</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CANCELAMENTO */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[650px] animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center shrink-0">
+                 <h3 className="text-2xl font-black uppercase">Cancelamento de Vendas</h3>
+                 <button onClick={() => setShowCancelModal(false)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                 <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input autoFocus placeholder="Busque por ID da venda..." value={cancelSearchId} onChange={e => setCancelSearchId(e.target.value)} className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl pl-12 pr-6 text-sm font-bold shadow-sm" />
+                 </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar">
+                 {todaySales.length > 0 ? todaySales.map(sale => (
+                    <div key={sale.id} className="bg-white dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 flex justify-between items-center group hover:border-rose-500/50 transition-all">
+                       <div>
+                          <p className="text-xs font-black text-rose-500 uppercase">{sale.id}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">{sale.date} • {sale.client || 'Consumidor Final'}</p>
+                       </div>
+                       <div className="text-right flex items-center gap-6">
+                          <p className="text-lg font-black text-slate-900 dark:text-white tabular-nums">R$ {sale.value.toLocaleString('pt-BR')}</p>
+                          <button onClick={() => handleCancelSale(sale)} className="px-6 py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-rose-500/20 hover:scale-105 active:scale-95 transition-all">Cancelar Venda</button>
+                       </div>
+                    </div>
+                 )) : <div className="text-center py-20 opacity-20 uppercase font-black text-xs tracking-widest">Nenhuma venda encontrada</div>}
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* MODAL GERAR OS */}
       {showOSModal && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
@@ -449,42 +551,82 @@ const PDV: React.FC = () => {
               </div>
               <div className="p-8 space-y-6">
                  <div className="space-y-1">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Diagnóstico / Descrição do Problema</label>
-                   <textarea autoFocus value={osDescription} onChange={e => setOsDescription(e.target.value)} rows={4} className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: Tela quebrada, não liga, etc..." />
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Diagnóstico / Problema</label>
+                   <textarea autoFocus value={osDescription} onChange={e => setOsDescription(e.target.value)} rows={4} className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: Troca de tela..." />
                  </div>
                  <div className="space-y-1">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Técnico Responsável (Opcional)</label>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Técnico (Opcional)</label>
                    <input value={osTechnician} onChange={e => setOsTechnician(e.target.value)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none" placeholder="Nome do técnico" />
                  </div>
-                 <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-2xl flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Valor da OS:</span>
-                    <span className="text-2xl font-black text-amber-600">R$ {totalGeral.toLocaleString('pt-BR')}</span>
-                 </div>
-                 <button onClick={handleFinalizeOS} className="w-full h-16 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase shadow-xl hover:bg-amber-600 transition-all">GERAR ORDEM DE SERVIÇO AGORA</button>
+                 <button onClick={handleFinalizeOS} className="w-full h-16 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase shadow-xl hover:bg-amber-600 transition-all">GERAR ORDEM DE SERVIÇO</button>
               </div>
            </div>
         </div>
       )}
 
-      {/* MODAL SUCESSO */}
-      {showSuccessModal && (
-        <div className={`fixed inset-0 z-[500] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : successType === 'RETURN' ? 'bg-amber-600' : successType === 'CANCEL' ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-           <div className="text-center text-white space-y-8 animate-in zoom-in-50 duration-500">
-              <span className="material-symbols-outlined text-[160px] animate-bounce">
-                {successType === 'OS' ? 'build' : successType === 'RETURN' ? 'assignment_return' : successType === 'CANCEL' ? 'cancel' : 'check_circle'}
-              </span>
-              <div className="space-y-2">
-                 <h2 className="text-5xl font-black uppercase tracking-tighter">{successType === 'OS' ? 'Ordem Gerada!' : successType === 'RETURN' ? 'Devolução Concluída!' : successType === 'CANCEL' ? 'Venda Cancelada!' : 'Venda Concluída!'}</h2>
-                 <p className="text-xl font-bold uppercase opacity-60">Operação processada com sucesso no sistema.</p>
+      {/* MODAL PREÇO */}
+      {showPriceInquiry && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[70vh] flex flex-col">
+              <div className="p-8 bg-primary text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-3xl">sell</span><h3 className="text-2xl font-black uppercase">Consulta Preço</h3></div>
+                <button onClick={() => setShowPriceInquiry(false)} className="size-10 hover:bg-white/20 rounded-xl"><span className="material-symbols-outlined">close</span></button>
               </div>
-              <div className="flex flex-col gap-4 max-w-sm mx-auto">
-                 <button onClick={() => setShowSuccessModal(false)} className="w-full py-5 bg-black/20 text-white border border-white/20 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black/30 transition-all">Continuar Operando</button>
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 shrink-0">
+                <input autoFocus placeholder="Digite o nome ou código..." className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl px-6 text-sm font-bold shadow-sm" onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                 {products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))).map(p => (
+                   <div key={p.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <img src={p.image} className="size-14 rounded-xl object-cover shrink-0" alt={p.name} />
+                        <div className="truncate"><p className="text-xs font-black uppercase truncate">{p.name}</p><p className="text-[10px] font-mono text-slate-400 uppercase">{p.sku}</p></div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-emerald-500 tabular-nums">R$ {p.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        {!p.isService && <p className={`text-[10px] font-black uppercase mt-1 ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-400'}`}>Estoque: {p.stock} un</p>}
+                      </div>
+                   </div>
+                 ))}
               </div>
            </div>
         </div>
       )}
 
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }`}</style>
+      {/* MODAL CLIENTE */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-8 bg-primary text-white flex justify-between items-center"><h3 className="text-2xl font-black uppercase">Cadastro Rápido</h3><button onClick={() => setShowCustomerModal(false)}><span className="material-symbols-outlined">close</span></button></div>
+              <div className="flex bg-slate-50 dark:bg-slate-800 p-1">
+                 <button onClick={() => setCustomerModalTab('basic')} className={`flex-1 py-3 text-[10px] font-black uppercase ${customerModalTab === 'basic' ? 'bg-white dark:bg-slate-900 text-primary' : 'text-slate-400'}`}>Básico</button>
+                 <button onClick={() => setCustomerModalTab('address')} className={`flex-1 py-3 text-[10px] font-black uppercase ${customerModalTab === 'address' ? 'bg-white dark:bg-slate-900 text-primary' : 'text-slate-400'}`}>Endereço</button>
+              </div>
+              <form onSubmit={handleQuickCustomerAdd} className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                 {customerModalTab === 'basic' ? (
+                   <div className="space-y-4">
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">Nome</label><input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">CPF/CNPJ</label><input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
+                         <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">WhatsApp</label><input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
+                      </div>
+                   </div>
+                 ) : (
+                   <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">CEP</label><input value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
+                         <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">Cidade</label><input value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
+                      </div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">Endereço</label><input value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
+                   </div>
+                 )}
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase shadow-xl mt-4">SALVAR</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; } @media print { body * { visibility: hidden; } #receipt-print, #receipt-print * { visibility: visible; } #receipt-print { position: absolute; left: 0; top: 0; width: 100%; } }`}</style>
     </div>
   );
 };
