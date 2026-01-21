@@ -225,7 +225,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* PRODUTOS VENDIDOS */}
-        <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
+        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
               <h4 className="text-[10px] font-black uppercase text-slate-500">Produtos vendidos</h4>
               <div className="flex gap-2 text-slate-300"><span className="material-symbols-outlined text-sm">ios_share</span><span className="material-symbols-outlined text-sm">grid_view</span></div>
@@ -237,11 +237,9 @@ const Dashboard: React.FC = () => {
                        <th className="px-4 py-4">Código</th>
                        <th className="px-4 py-4">Produto</th>
                        <th className="px-4 py-4">UN</th>
-                       <th className="px-4 py-4">Grupo</th>
-                       <th className="px-4 py-4">Subgrupo</th>
-                       <th className="px-4 py-4 text-center">Qtd. estoq.</th>
-                       <th className="px-4 py-4 text-center">Qtd. vend.</th>
-                       <th className="px-4 py-4 text-right">Valor total</th>
+                       <th className="px-4 py-4 text-center">Estoque</th>
+                       <th className="px-4 py-4 text-center">Vend.</th>
+                       <th className="px-4 py-4 text-right">Total</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -250,15 +248,13 @@ const Dashboard: React.FC = () => {
                          <td className="px-4 py-4 font-mono text-slate-400">{item.code}</td>
                          <td className="px-4 py-4 font-black uppercase text-slate-700 dark:text-slate-200 truncate max-w-[150px]">{item.name}</td>
                          <td className="px-4 py-4 font-bold text-slate-400">UN</td>
-                         <td className="px-4 py-4 uppercase font-bold text-slate-400">{item.group}</td>
-                         <td className="px-4 py-4 uppercase font-bold text-slate-400">{item.subgroup}</td>
                          <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center gap-1">
                                {item.stock <= 0 && <span className="material-symbols-outlined text-rose-500 text-[12px]">warning</span>}
-                               <span className={`font-black tabular-nums ${item.stock <= 0 ? 'text-rose-500' : 'text-slate-500'}`}>{item.stock.toLocaleString('pt-BR', {minimumFractionDigits: 3})}</span>
+                               <span className={`font-black tabular-nums ${item.stock <= 0 ? 'text-rose-500' : 'text-slate-500'}`}>{item.stock}</span>
                             </div>
                          </td>
-                         <td className="px-4 py-4 text-center font-black text-slate-700 dark:text-slate-300 tabular-nums">{item.qty.toLocaleString('pt-BR', {minimumFractionDigits: 3})}</td>
+                         <td className="px-4 py-4 text-center font-black text-slate-700 dark:text-slate-300 tabular-nums">{item.qty}</td>
                          <td className="px-4 py-4 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {item.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                       </tr>
                     ))}
@@ -267,8 +263,8 @@ const Dashboard: React.FC = () => {
            </div>
         </div>
 
-        {/* DESEMPENHO DE VENDEDORES */}
-        <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
+        {/* DESEMPENHO DE VENDEDORES (Atualizado com colunas solicitadas) */}
+        <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
               <h4 className="text-[10px] font-black uppercase text-slate-500">Desempenho de vendedores</h4>
               <div className="flex gap-2 text-slate-300"><span className="material-symbols-outlined text-sm">ios_share</span><span className="material-symbols-outlined text-sm">grid_view</span></div>
@@ -276,22 +272,26 @@ const Dashboard: React.FC = () => {
            <div className="overflow-auto flex-1 custom-scrollbar">
               <table className="w-full text-left">
                  <thead className="sticky top-0 bg-white dark:bg-slate-900 z-10 border-b">
-                    <tr className="text-[9px] font-black uppercase text-slate-400">
-                       <th className="px-4 py-4">Vendedor</th>
-                       <th className="px-4 py-4 text-center">Reação</th>
-                       <th className="px-4 py-4 text-center">Qtd. vend.</th>
-                       <th className="px-4 py-4 text-right">Valor total</th>
-                       <th className="px-4 py-4 text-right">Ticket méd.</th>
+                    <tr className="text-[8px] font-black uppercase text-slate-400">
+                       <th className="px-3 py-4">Vendedor</th>
+                       <th className="px-2 py-4 text-center">Status</th>
+                       <th className="px-2 py-4 text-center">Vendas</th>
+                       <th className="px-2 py-4 text-center">Itens</th>
+                       <th className="px-2 py-4 text-center">Ipv</th>
+                       <th className="px-3 py-4 text-right">Total</th>
+                       <th className="px-3 py-4 text-right">T. Médio</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                     {vendorPerformance.map((v, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 text-[10px]">
-                         <td className="px-4 py-4 font-black uppercase text-slate-600 dark:text-slate-300 truncate max-w-[80px]">{v.name}</td>
-                         <td className="px-4 py-4 text-center text-lg">{v.reaction.emoji}</td>
-                         <td className="px-4 py-4 text-center text-slate-500 font-bold tabular-nums">{v.qtySales}</td>
-                         <td className="px-4 py-4 text-right font-black text-slate-700 dark:text-slate-200 tabular-nums">R$ {v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                         <td className="px-4 py-4 text-right font-black text-rose-600 tabular-nums">R$ {v.ticket.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 text-[9px]">
+                         <td className="px-3 py-4 font-black uppercase text-slate-600 dark:text-slate-300 truncate max-w-[70px]">{v.name}</td>
+                         <td className="px-2 py-4 text-center text-lg">{v.reaction.emoji}</td>
+                         <td className="px-2 py-4 text-center text-slate-500 font-bold tabular-nums">{v.qtySales}</td>
+                         <td className="px-2 py-4 text-center text-primary font-black tabular-nums">{v.qtyProds}</td>
+                         <td className="px-2 py-4 text-center text-slate-700 dark:text-slate-200 font-black tabular-nums bg-slate-50/50 dark:bg-slate-800/50">{v.prodAvg.toFixed(2)}</td>
+                         <td className="px-3 py-4 text-right font-black text-slate-700 dark:text-slate-200 tabular-nums">R$ {v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                         <td className="px-3 py-4 text-right font-black text-rose-600 tabular-nums">R$ {v.ticket.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                       </tr>
                     ))}
                  </tbody>
