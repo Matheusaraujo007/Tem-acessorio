@@ -1,10 +1,12 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../AppContext';
+import { useNavigate } from 'react-router-dom';
 import { CartItem, Product, Customer, UserRole, User, ServiceOrder, ServiceOrderStatus, Establishment, TransactionStatus, Transaction } from '../types';
 
 const PDV: React.FC = () => {
   const { products, customers, users, currentUser, processSale, establishments, addServiceOrder, addCustomer, addEstablishment, addUser, transactions, addTransaction, systemConfig, addProduct } = useApp();
+  const navigate = useNavigate();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Todos');
@@ -376,6 +378,9 @@ const PDV: React.FC = () => {
            <button onClick={() => setShowPriceInquiry(true)} className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-xs hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2">
              <span className="material-symbols-outlined text-lg">sell</span> Consulta Preço
            </button>
+           <button onClick={() => navigate('/servicos?tab=list')} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-primary transition-all uppercase flex items-center gap-2">
+             <span className="material-symbols-outlined text-lg">build</span> Gerenciar OS
+           </button>
            <button onClick={() => window.history.back()} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-black transition-all uppercase tracking-widest">Sair</button>
         </div>
       </header>
@@ -401,6 +406,7 @@ const PDV: React.FC = () => {
                    <div className="mt-auto flex justify-between items-end">
                       <div className="flex flex-col"><span className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR')}</span></div>
                       {!p.isService && <div className="text-right"><p className={`text-xs font-black leading-none ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock} <span className="text-[8px]">un</span></p></div>}
+                      {p.isService && <div className="text-right"><p className="text-[10px] font-black text-amber-500 uppercase">Mão de Obra</p></div>}
                    </div>
                 </div>
               </div>
@@ -621,6 +627,7 @@ const PDV: React.FC = () => {
                  ) : (
                    <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
+                         {/* Fix: replaced 'v' with 'e.target.value' to resolve reference error */}
                          <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">CEP</label><input value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
                          <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase px-2">Cidade</label><input value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-sm font-bold border-none" /></div>
                       </div>
@@ -659,7 +666,7 @@ const PDV: React.FC = () => {
                       <div className="text-right shrink-0">
                         <p className="text-lg font-black text-emerald-500 tabular-nums leading-none">R$ {p.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         {!p.isService && <p className={`text-[10px] font-black uppercase mt-1 ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-400'}`}>Estoque: {p.stock} un</p>}
-                        {p.isService && <p className="text-[10px] font-black uppercase mt-1 text-amber-500">Serviço</p>}
+                        {p.isService && <p className="text-[10px] font-black uppercase mt-1 text-amber-500">Mão de Obra</p>}
                       </div>
                    </div>
                  ))}

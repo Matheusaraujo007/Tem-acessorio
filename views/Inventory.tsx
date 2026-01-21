@@ -124,7 +124,7 @@ const Inventory: React.FC = () => {
                 <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Item</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Referências</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Financeiro</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Estoque</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Controle</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Ações</th>
               </tr>
             </thead>
@@ -154,7 +154,7 @@ const Inventory: React.FC = () => {
                   </td>
                   <td className="px-8 py-6 text-center">
                     {p.isService ? (
-                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full">Serviço</span>
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl">Mão de Obra</span>
                     ) : (
                       <div className="flex flex-col items-center">
                         <span className={`text-sm font-black tabular-nums ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock}</span>
@@ -175,7 +175,6 @@ const Inventory: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL COMPLEXO DE CADASTRO */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
@@ -189,7 +188,6 @@ const Inventory: React.FC = () => {
             
             <form onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-10">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                 {/* COLUNA ESQUERDA: IMAGEM E INFOS BÁSICAS */}
                  <div className="lg:col-span-4 space-y-8">
                     <div className="space-y-4">
                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Identidade Visual</p>
@@ -206,7 +204,6 @@ const Inventory: React.FC = () => {
                        </div>
                        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="image/*" />
                     </div>
-
                     <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl space-y-4">
                        <p className="text-[10px] font-black text-primary uppercase tracking-widest text-center">Resumo do Cadastro</p>
                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
@@ -219,10 +216,7 @@ const Inventory: React.FC = () => {
                        </div>
                     </div>
                  </div>
-
-                 {/* COLUNA DIREITA: CAMPOS TÉCNICOS */}
                  <div className="lg:col-span-8 space-y-10">
-                    {/* SEÇÃO 1: INFORMAÇÃO BÁSICA */}
                     <div className="space-y-6">
                        <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                           <span className="material-symbols-outlined text-slate-400 text-lg">info</span>
@@ -243,20 +237,8 @@ const Inventory: React.FC = () => {
                                 <input type="text" value={form.brand} onChange={e => setForm({...form, brand: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-black uppercase" placeholder="Ex: Samsung" />
                              </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">SKU (Código Interno)</label>
-                                <input type="text" required value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-mono font-bold uppercase" />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Código de Barras (EAN)</label>
-                                <input type="text" value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-mono font-bold" placeholder="789..." />
-                             </div>
-                          </div>
                        </div>
                     </div>
-
-                    {/* SEÇÃO 2: PRECIFICAÇÃO */}
                     <div className="space-y-6">
                        <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                           <span className="material-symbols-outlined text-slate-400 text-lg">payments</span>
@@ -275,37 +257,14 @@ const Inventory: React.FC = () => {
                              <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Unidade</label>
                              <select value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-black uppercase">
                                 <option value="UN">UNIDADE (UN)</option>
-                                <option value="KG">QUILO (KG)</option>
-                                <option value="LT">LITRO (LT)</option>
-                                <option value="CX">CAIXA (CX)</option>
-                                <option value="MT">METRO (MT)</option>
+                                <option value="H">HORA (H)</option>
+                                <option value="SERV">SERVIÇO (SERV)</option>
                              </select>
                           </div>
                        </div>
                     </div>
-
-                    {/* SEÇÃO 3: LOGÍSTICA (APENAS PRODUTO) */}
-                    {!form.isService && (
-                       <div className="space-y-6">
-                          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                             <span className="material-symbols-outlined text-slate-400 text-lg">inventory</span>
-                             <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest">Estoque & Logística</h4>
-                          </div>
-                          <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Saldo em Estoque</label>
-                                <input type="number" required value={form.stock} onChange={e => setForm({...form, stock: parseInt(e.target.value)})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-lg font-black" />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Localização Interna</label>
-                                <input type="text" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" placeholder="Ex: Gôndola A-12" />
-                             </div>
-                          </div>
-                       </div>
-                    )}
                  </div>
               </div>
-              
               <div className="pt-10 border-t border-slate-100 dark:border-slate-800">
                  <button type="submit" className={`w-full h-20 rounded-[2.5rem] font-black text-sm uppercase tracking-widest shadow-2xl transition-all active:scale-95 text-white ${form.isService ? 'bg-amber-500 shadow-amber-500/20' : 'bg-primary shadow-primary/20'}`}>
                     {editingId ? 'Confirmar Alterações' : (form.isService ? 'Cadastrar Novo Serviço' : 'Efetivar Cadastro de Produto')}
@@ -315,7 +274,6 @@ const Inventory: React.FC = () => {
           </div>
         </div>
       )}
-
       <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }`}</style>
     </div>
   );

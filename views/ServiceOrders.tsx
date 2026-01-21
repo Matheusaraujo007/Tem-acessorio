@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../AppContext';
-import { ServiceOrder, ServiceOrderStatus, UserRole, Product } from '../types';
+import { ServiceOrder, ServiceOrderStatus, UserRole, Product, TransactionStatus } from '../types';
 import { useLocation } from 'react-router-dom';
 
 const ServiceOrders: React.FC = () => {
-  const { serviceOrders, updateServiceOrder, currentUser, products, addProduct, deleteProduct, establishments } = useApp();
+  const { serviceOrders, updateServiceOrder, currentUser, products, addProduct, deleteProduct, establishments, addTransaction } = useApp();
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const initialTab = query.get('tab') || 'list';
@@ -14,6 +14,10 @@ const ServiceOrders: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('TODAS');
   const [selectedOS, setSelectedOS] = useState<ServiceOrder | null>(null);
   
+  // Estados para Pagamento da OS
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('Pix');
+
   // Estados para Gestão do Catálogo de Serviços
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [serviceForm, setServiceForm] = useState<Partial<Product>>({
@@ -35,8 +39,39 @@ const ServiceOrders: React.FC = () => {
   }, [serviceOrders, filterStatus, isAdmin, currentStore]);
 
   const handleUpdateStatus = (os: ServiceOrder, newStatus: ServiceOrderStatus) => {
+    if (newStatus === ServiceOrderStatus.FINISHED) {
+      setShowPaymentModal(true);
+      return;
+    }
     updateServiceOrder({ ...os, status: newStatus });
     if (selectedOS?.id === os.id) setSelectedOS({ ...os, status: newStatus });
+  };
+
+  const handleFinalizeAndPay = async () => {
+    if (!selectedOS) return;
+    
+    // 1. Criar Transação Financeira
+    await addTransaction({
+      id: `PAY-OS-${selectedOS.id}`,
+      date: new Date().toISOString().split('T')[0],
+      description: `Recebimento de Serviço (OS: ${selectedOS.id})`,
+      store: selectedOS.store,
+      category: 'Serviço',
+      status: TransactionStatus.PAID,
+      value: selectedOS.totalValue,
+      type: 'INCOME',
+      method: paymentMethod,
+      client: selectedOS.customerName,
+      clientId: selectedOS.customerId,
+      items: selectedOS.items
+    });
+
+    // 2. Atualizar Status da OS
+    const updated = { ...selectedOS, status: ServiceOrderStatus.FINISHED };
+    await updateServiceOrder(updated);
+    setSelectedOS(updated);
+    setShowPaymentModal(false);
+    alert('Ordem de Serviço finalizada e pagamento registrado com sucesso!');
   };
 
   const handleSaveService = async (e: React.FormEvent) => {
@@ -173,41 +208,32 @@ const ServiceOrders: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL CADASTRO SERVIÇO */}
-      {showServiceModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
-                 <h3 className="text-2xl font-black uppercase">Cadastrar Serviço</h3>
-                 <button onClick={() => setShowServiceModal(false)} className="material-symbols-outlined">close</button>
+      {/* MODAL PAGAMENTO OS */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-emerald-500 text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">Recebimento OS</h3>
+                 <button onClick={() => setShowPaymentModal(false)} className="material-symbols-outlined">close</button>
               </div>
-              <form onSubmit={handleSaveService} className="p-10 space-y-6">
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase px-4 tracking-widest">Nome do Serviço (ex: Conserto de Tela)</label>
-                    <input required value={serviceForm.name} onChange={e => setServiceForm({...serviceForm, name: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-amber-500 uppercase" />
+              <div className="p-10 space-y-8">
+                 <div className="text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Total a Receber</p>
+                    <p className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {selectedOS?.totalValue.toLocaleString('pt-BR')}</p>
                  </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-500 uppercase px-4 tracking-widest">Ref / Código</label>
-                       <input value={serviceForm.sku} onChange={e => setServiceForm({...serviceForm, sku: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-amber-500" placeholder="Automático" />
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-500 uppercase px-4 tracking-widest">Categoria</label>
-                       <input value={serviceForm.category} onChange={e => setServiceForm({...serviceForm, category: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-amber-500 uppercase" />
-                    </div>
+                 <div className="grid grid-cols-2 gap-3">
+                    {['Dinheiro', 'Pix', 'Débito', 'Crédito'].map(m => (
+                      <button key={m} onClick={() => setPaymentMethod(m)} className={`py-4 rounded-2xl border-2 font-black text-[10px] uppercase transition-all ${paymentMethod === m ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-emerald-200'}`}>{m}</button>
+                    ))}
                  </div>
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase px-4 tracking-widest">Valor da Mão de Obra (R$)</label>
-                    <input type="number" step="0.01" required value={serviceForm.salePrice} onChange={e => setServiceForm({...serviceForm, salePrice: parseFloat(e.target.value)})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-lg font-black text-amber-500 tabular-nums border-none outline-none focus:ring-2 focus:ring-amber-500" />
-                 </div>
-                 <button type="submit" className="w-full h-16 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95">Salvar Serviço no Catálogo</button>
-              </form>
+                 <button onClick={handleFinalizeAndPay} className="w-full h-16 bg-emerald-500 text-white rounded-[1.5rem] font-black text-xs uppercase shadow-xl hover:scale-105 transition-all active:scale-95">CONFIRMAR RECEBIMENTO</button>
+              </div>
            </div>
         </div>
       )}
 
       {/* MODAL DETALHADO DA OS */}
-      {selectedOS && (
+      {selectedOS && !showPaymentModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[700px]">
               <div className="w-full md:w-[350px] bg-slate-50 dark:bg-slate-800/50 p-10 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between">
@@ -215,18 +241,22 @@ const ServiceOrders: React.FC = () => {
                     <button onClick={() => setSelectedOS(null)} className="text-slate-400 hover:text-rose-500 flex items-center gap-2 text-[10px] font-black uppercase"><span className="material-symbols-outlined text-lg">arrow_back</span> Voltar</button>
                     <div>
                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Situação Atual</h4>
-                       <div className={`px-6 py-3 rounded-2xl text-xs font-black uppercase text-white text-center shadow-lg ${selectedOS.status === ServiceOrderStatus.OPEN ? 'bg-amber-500 shadow-amber-500/20' : selectedOS.status === ServiceOrderStatus.IN_PROGRESS ? 'bg-primary shadow-primary/20' : 'bg-emerald-500 shadow-emerald-500/20'}`}>
+                       <div className={`px-6 py-3 rounded-2xl text-xs font-black uppercase text-white text-center shadow-lg ${selectedOS.status === ServiceOrderStatus.OPEN ? 'bg-amber-500 shadow-amber-500/20' : selectedOS.status === ServiceOrderStatus.IN_PROGRESS ? 'bg-primary shadow-primary/20' : selectedOS.status === ServiceOrderStatus.FINISHED ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500'}`}>
                           {selectedOS.status}
                        </div>
                     </div>
-                    <div className="space-y-4 pt-8 border-t border-slate-200 dark:border-slate-700">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alterar Status</p>
-                       <div className="grid grid-cols-1 gap-2">
-                          {Object.values(ServiceOrderStatus).map(s => (
-                             <button key={s} onClick={() => handleUpdateStatus(selectedOS, s)} className="w-full py-3 bg-white dark:bg-slate-900 rounded-xl text-[9px] font-black uppercase border-2 border-transparent hover:border-primary transition-all shadow-sm">Mudar para {s}</button>
-                          ))}
-                       </div>
-                    </div>
+                    {selectedOS.status !== ServiceOrderStatus.FINISHED && (
+                      <div className="space-y-4 pt-8 border-t border-slate-200 dark:border-slate-700">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alterar Status</p>
+                         <div className="grid grid-cols-1 gap-2">
+                            {[ServiceOrderStatus.IN_PROGRESS, ServiceOrderStatus.FINISHED, ServiceOrderStatus.CANCELLED].map(s => (
+                               <button key={s} onClick={() => handleUpdateStatus(selectedOS, s as ServiceOrderStatus)} className={`w-full py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all shadow-sm ${s === ServiceOrderStatus.FINISHED ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : 'bg-white dark:bg-slate-900 border-transparent hover:border-primary'}`}>
+                                 {s === ServiceOrderStatus.FINISHED ? 'Concluir e Receber' : `Mudar para ${s}`}
+                               </button>
+                            ))}
+                         </div>
+                      </div>
+                    )}
                  </div>
                  <button className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">print</span> Imprimir OS</button>
               </div>
@@ -284,6 +314,7 @@ const ServiceOrders: React.FC = () => {
            </div>
         </div>
       )}
+      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }`}</style>
     </div>
   );
 };
