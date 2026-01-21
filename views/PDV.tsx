@@ -14,12 +14,13 @@ const PDV: React.FC = () => {
   const [showOSModal, setShowOSModal] = useState(false);
   const [showStockInquiry, setShowStockInquiry] = useState(false);
   const [showReturnsModal, setShowReturnsModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showTerminalMenu, setShowTerminalMenu] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   
-  const [successType, setSuccessType] = useState<'SALE' | 'OS' | 'RETURN'>('SALE');
+  const [successType, setSuccessType] = useState<'SALE' | 'OS' | 'RETURN' | 'CANCEL'>('SALE');
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedVendorId, setSelectedVendorId] = useState('');
@@ -30,8 +31,9 @@ const PDV: React.FC = () => {
   const [osDescription, setOsDescription] = useState('');
   const [osTechnician, setOsTechnician] = useState('');
 
-  // Estados Troca/Devolução
+  // Estados Troca/Devolução/Cancelamento
   const [returnSearchCustomer, setReturnSearchCustomer] = useState('');
+  const [cancelSearchId, setCancelSearchId] = useState('');
   const [selectedReturnCustomer, setSelectedReturnCustomer] = useState<Customer | null>(null);
   const [customerSales, setCustomerSales] = useState<any[]>([]);
 
@@ -210,6 +212,53 @@ const PDV: React.FC = () => {
     }
   };
 
+  // Lógica de Cancelamento de Venda
+  const handleCancelSale = async (sale: Transaction) => {
+    if (confirm(`DESEJA REALMENTE CANCELAR A VENDA ${sale.id}?\n\nOs itens retornarão ao estoque e o valor de R$ ${sale.value.toLocaleString('pt-BR')} será estornado do caixa como uma despesa de cancelamento.`)) {
+      try {
+        // Estornar Estoque
+        if (sale.items) {
+          for (const item of sale.items) {
+            const product = products.find(p => p.id === item.id);
+            if (product && !product.isService) {
+              await addProduct({ ...product, stock: product.stock + item.quantity });
+            }
+          }
+        }
+
+        // Criar transação de estorno (Saída)
+        await addTransaction({
+          id: `CANCEL-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          description: `Estorno de Cancelamento (Ref: ${sale.id})`,
+          store: currentStore.name,
+          category: 'Cancelamento',
+          status: TransactionStatus.PAID,
+          value: sale.value,
+          type: 'EXPENSE',
+          client: sale.client,
+          clientId: sale.clientId,
+          vendorId: sale.vendorId
+        });
+
+        setSuccessType('CANCEL');
+        setShowCancelModal(false);
+        setCancelSearchId('');
+        setShowSuccessModal(true);
+      } catch (error) {
+        alert("Erro ao processar cancelamento.");
+      }
+    }
+  };
+
+  const todaySales = useMemo(() => {
+    return transactions.filter(t => 
+      t.type === 'INCOME' && 
+      t.category === 'Venda' && 
+      (t.id.toLowerCase().includes(cancelSearchId.toLowerCase()) || (t.client && t.client.toLowerCase().includes(cancelSearchId.toLowerCase())))
+    ).slice(0, 20);
+  }, [transactions, cancelSearchId]);
+
   const handleQuickCustomerAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = `c-${Date.now()}`;
@@ -318,13 +367,16 @@ const PDV: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-3">
+           <button onClick={() => setShowCancelModal(true)} className="px-6 py-2.5 bg-rose-500/10 text-rose-500 rounded-xl font-black text-xs hover:bg-rose-500 hover:text-white transition-all uppercase flex items-center gap-2">
+             <span className="material-symbols-outlined text-lg">cancel</span> Cancelamento
+           </button>
            <button onClick={() => setShowReturnsModal(true)} className="px-6 py-2.5 bg-amber-500/10 text-amber-600 rounded-xl font-black text-xs hover:bg-amber-500 hover:text-white transition-all uppercase flex items-center gap-2">
              <span className="material-symbols-outlined text-lg">history</span> Trocas
            </button>
            <button onClick={() => setShowStockInquiry(true)} className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-xs hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2">
              <span className="material-symbols-outlined text-lg">inventory_2</span> Estoque
            </button>
-           <button onClick={() => window.history.back()} className="px-6 py-2.5 bg-rose-500 text-white rounded-xl font-black text-xs hover:bg-rose-600 transition-all uppercase tracking-widest">Sair</button>
+           <button onClick={() => window.history.back()} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-black transition-all uppercase tracking-widest">Sair</button>
         </div>
       </header>
 
@@ -424,13 +476,13 @@ const PDV: React.FC = () => {
 
       {/* MODAL SUCESSO E IMPRESSÃO */}
       {showSuccessModal && (
-        <div className={`fixed inset-0 z-[500] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : successType === 'RETURN' ? 'bg-amber-600' : 'bg-emerald-500'}`}>
+        <div className={`fixed inset-0 z-[500] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : successType === 'RETURN' ? 'bg-amber-600' : successType === 'CANCEL' ? 'bg-rose-500' : 'bg-emerald-500'}`}>
            <div className="text-center text-white space-y-8 animate-in zoom-in-50 duration-500 print:hidden">
               <span className="material-symbols-outlined text-[160px] animate-bounce">
-                {successType === 'OS' ? 'build' : successType === 'RETURN' ? 'assignment_return' : 'check_circle'}
+                {successType === 'OS' ? 'build' : successType === 'RETURN' ? 'assignment_return' : successType === 'CANCEL' ? 'cancel' : 'check_circle'}
               </span>
               <div className="space-y-2">
-                 <h2 className="text-5xl font-black uppercase tracking-tighter">{successType === 'OS' ? 'Ordem Gerada!' : successType === 'RETURN' ? 'Devolução Concluída!' : 'Venda Concluída!'}</h2>
+                 <h2 className="text-5xl font-black uppercase tracking-tighter">{successType === 'OS' ? 'Ordem Gerada!' : successType === 'RETURN' ? 'Devolução Concluída!' : successType === 'CANCEL' ? 'Venda Cancelada!' : 'Venda Concluída!'}</h2>
                  <p className="text-xl font-bold uppercase opacity-60">Operação processada com sucesso no sistema.</p>
               </div>
               <div className="flex flex-col gap-4 max-w-sm mx-auto">
@@ -447,7 +499,48 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* OUTROS MODAIS (Checkout, OS, Clientes, etc.) - Mantendo lógica anterior */}
+      {/* MODAL CANCELAMENTO */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[650px] animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center shrink-0">
+                 <h3 className="text-2xl font-black uppercase">Cancelamento de Vendas</h3>
+                 <button onClick={() => setShowCancelModal(false)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                 <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input autoFocus placeholder="Busque por ID da venda ou Nome do Cliente..." value={cancelSearchId} onChange={e => setCancelSearchId(e.target.value)} className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl pl-12 pr-6 text-sm font-bold shadow-sm" />
+                 </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar">
+                 {todaySales.length > 0 ? todaySales.map(sale => (
+                    <div key={sale.id} className="bg-white dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 flex justify-between items-center group hover:border-rose-500/50 transition-all">
+                       <div>
+                          <p className="text-xs font-black text-rose-500 uppercase">{sale.id}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">{sale.date} • {sale.client || 'Consumidor Final'}</p>
+                          <div className="mt-2 flex gap-1">
+                             {sale.items?.slice(0, 3).map((item, i) => (
+                               <span key={i} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded-md text-[8px] font-black uppercase text-slate-400">{item.name.substring(0, 10)}</span>
+                             ))}
+                             {(sale.items?.length || 0) > 3 && <span className="text-[8px] font-black text-slate-400">...</span>}
+                          </div>
+                       </div>
+                       <div className="text-right flex items-center gap-6">
+                          <div>
+                             <p className="text-lg font-black text-slate-900 dark:text-white tabular-nums">R$ {sale.value.toLocaleString('pt-BR')}</p>
+                             <p className="text-[9px] font-black text-slate-400 uppercase">{sale.method}</p>
+                          </div>
+                          <button onClick={() => handleCancelSale(sale)} className="px-6 py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-rose-500/20 hover:scale-105 active:scale-95 transition-all">Cancelar Venda</button>
+                       </div>
+                    </div>
+                 )) : <div className="text-center py-20 opacity-20 uppercase font-black text-xs tracking-widest">Nenhuma venda encontrada para o termo "{cancelSearchId}"</div>}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CHECKOUT */}
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -542,7 +635,7 @@ const PDV: React.FC = () => {
 
       {showStockInquiry && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[600px] animate-in zoom-in-95">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 bg-primary text-white flex justify-between items-center"><h3 className="text-2xl font-black uppercase">Consulta Estoque</h3><button onClick={() => setShowStockInquiry(false)} className="size-10 hover:bg-white/20 rounded-xl"><span className="material-symbols-outlined">close</span></button></div>
               <div className="p-6 bg-slate-50 dark:bg-slate-800 shrink-0"><input autoFocus placeholder="Digite o nome..." className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl px-6 text-sm font-bold shadow-sm" onChange={e => setSearch(e.target.value)} /></div>
               <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">

@@ -24,7 +24,8 @@ export enum TransactionStatus {
   PAID = 'PAGO',
   PENDING = 'PENDENTE',
   OVERDUE = 'ATRASADO',
-  APPROVED = 'ATRASADO'
+  APPROVED = 'ATRASADO',
+  CANCELLED = 'CANCELADO'
 }
 
 export enum ServiceOrderStatus {
