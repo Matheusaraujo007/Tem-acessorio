@@ -19,8 +19,10 @@ const Reports: React.FC = () => {
   const [startDate, setStartDate] = useState(thirtyDaysAgoStr);
   const [endDate, setEndDate] = useState(todayStr);
   
-  // Novos Estados de Filtro
+  // Estados de Filtro Granulares
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStore, setFilterStore] = useState('Todas');
+  const [filterCustomer, setFilterCustomer] = useState('');
   const [filterCategory, setFilterCategory] = useState('Todas');
   const [filterPayment, setFilterPayment] = useState('Todos');
 
@@ -32,26 +34,44 @@ const Reports: React.FC = () => {
     return ['Todas', ...Array.from(new Set(products.map(p => p.category)))];
   }, [products]);
 
-  // Filtro base de transações (Data e Unidade)
+  const availableStores = useMemo(() => {
+    return ['Todas', ...Array.from(new Set(establishments.map(e => e.name)))];
+  }, [establishments]);
+
+  // Filtro base de transações (Refatorado para filtros granulares)
   const periodSales = useMemo(() => {
     return (transactions || []).filter(t => {
-      const belongsToStore = isAdmin || t.store === currentStoreName;
+      // 1. Filtro de Segurança/Escopo de Unidade
+      const belongsToStoreScope = isAdmin || t.store === currentStoreName;
+      if (!belongsToStoreScope) return false;
+
+      // 2. Filtro de Tipo (Apenas Vendas/Serviços que geram receita)
       const isCorrectType = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
+      if (!isCorrectType) return false;
+
+      // 3. Filtro de Intervalo de Datas
       const inRange = t.date >= startDate && t.date <= endDate;
+      if (!inRange) return false;
       
-      // Aplicar filtro de pagamento se selecionado
+      // 4. Filtro por Loja Específica (Selecionada no cabeçalho)
+      const matchesStore = filterStore === 'Todas' || t.store === filterStore;
+      if (!matchesStore) return false;
+
+      // 5. Filtro por Forma de Pagamento
       const matchesPayment = filterPayment === 'Todos' || t.method === filterPayment;
+      if (!matchesPayment) return false;
       
-      // Aplicar busca textual (para relatório analítico)
-      const matchesSearch = searchTerm === '' || 
-        (t.client?.toLowerCase().includes(searchTerm.toLowerCase())) || 
-        (t.id.toLowerCase().includes(searchTerm.toLowerCase()));
+      // 6. Filtro por Cliente (Busca Textual)
+      const targetCustomer = filterCustomer || searchTerm; // Usa o específico ou o geral
+      const matchesCustomer = targetCustomer === '' || 
+        (t.client?.toLowerCase().includes(targetCustomer.toLowerCase()));
+      if (!matchesCustomer) return false;
 
-      return belongsToStore && isCorrectType && inRange && matchesPayment && matchesSearch;
+      return true;
     });
-  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterPayment, searchTerm]);
+  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore, filterPayment, filterCustomer, searchTerm]);
 
-  // --- LÓGICAS DE AGRUPAMENTO COM FILTROS ADICIONAIS ---
+  // --- LÓGICAS DE AGRUPAMENTO ---
 
   const dailyData = useMemo(() => {
     const map: Record<string, { label: string, total: number, count: number }> = {};
@@ -90,17 +110,13 @@ const Reports: React.FC = () => {
     periodSales.forEach(s => {
       const cid = s.clientId || 'avulso';
       const cname = s.client || 'Consumidor Final';
-      
-      // Filtro de Busca por Cliente
-      if (searchTerm !== '' && !cname.toLowerCase().includes(searchTerm.toLowerCase())) return;
-
       if (!map[cid]) map[cid] = { name: cname, total: 0, count: 0, lastSale: s.date };
       map[cid].total += s.value;
       map[cid].count += 1;
       if (s.date > map[cid].lastSale) map[cid].lastSale = s.date;
     });
     return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [periodSales, searchTerm]);
+  }, [periodSales]);
 
   const vendorStats = useMemo(() => {
     const map: Record<string, { name: string, total: number, count: number, items: number }> = {};
@@ -122,7 +138,6 @@ const Reports: React.FC = () => {
     periodSales.forEach(s => {
       if (s.items && Array.isArray(s.items)) {
         s.items.forEach(i => {
-          // Aplicar Filtros de Produto (Categoria e Nome/SKU)
           const matchesCategory = filterCategory === 'Todas' || i.category === filterCategory;
           const matchesSearch = searchTerm === '' || 
             i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -167,7 +182,7 @@ const Reports: React.FC = () => {
     return Object.values(unitMap).sort((a, b) => b.total - a.total);
   }, [periodSales, users]);
 
-  // KPI Dinâmicos baseados nos filtros
+  // KPI Dinâmicos
   const totalRevenue = periodSales.reduce((acc, t) => acc + t.value, 0);
   const globalAvgTicket = periodSales.length > 0 ? totalRevenue / periodSales.length : 0;
 
@@ -207,7 +222,7 @@ const Reports: React.FC = () => {
             background: white !important;
             color: black !important;
           }
-          .no-print, aside, header, nav, button, input[type="date"], .filter-bar { display: none !important; }
+          .no-print, aside, header, nav, button, input[type="date"], .filter-bar, .header-filter-row { display: none !important; }
           .rounded-[3rem], .rounded-[2rem], .rounded-3xl { border-radius: 0 !important; }
           .shadow-sm, .shadow-xl, .shadow-2xl, .shadow-lg { box-shadow: none !important; border: 1px solid #eee !important; }
           table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; }
@@ -246,52 +261,6 @@ const Reports: React.FC = () => {
              </button>
           </div>
         </div>
-
-        {/* BARRA DE FILTROS DINÂMICA (Apenas nos relatórios solicitados) */}
-        {(['por_vendas', 'por_cliente', 'por_produto', 'margem_bruta', 'entrega_futura'].includes(reportType)) && (
-          <div className="filter-bar no-print bg-white dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center animate-in slide-in-from-top-4">
-            <div className="flex-1 min-w-[250px] relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-              <input 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)} 
-                placeholder={reportType === 'por_cliente' ? "Buscar por nome do cliente..." : "Buscar por nome ou SKU..."}
-                className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-12 pr-4 text-[10px] font-black uppercase focus:ring-2 focus:ring-primary/20" 
-              />
-            </div>
-
-            {(reportType === 'por_produto' || reportType === 'margem_bruta') && (
-              <select 
-                value={filterCategory} 
-                onChange={e => setFilterCategory(e.target.value)}
-                className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-[10px] font-black uppercase tracking-widest"
-              >
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
-
-            {reportType === 'por_vendas' && (
-              <select 
-                value={filterPayment} 
-                onChange={e => setFilterPayment(e.target.value)}
-                className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-[10px] font-black uppercase tracking-widest"
-              >
-                <option value="Todos">Todas as Formas</option>
-                <option value="Dinheiro">Dinheiro</option>
-                <option value="Pix">Pix</option>
-                <option value="Debito">Cartão de Débito</option>
-                <option value="Credito">Cartão de Crédito</option>
-              </select>
-            )}
-
-            <button 
-              onClick={() => { setSearchTerm(''); setFilterCategory('Todas'); setFilterPayment('Todos'); }} 
-              className="h-12 px-6 text-[9px] font-black uppercase text-slate-400 hover:text-primary transition-all"
-            >
-              Limpar Filtros
-            </button>
-          </div>
-        )}
 
         {/* KPI GRID */}
         <div className="kpi-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -343,7 +312,7 @@ const Reports: React.FC = () => {
               </div>
            )}
 
-           {/* 2. RELATÓRIOS TEMPORAIS (DIÁRIA, ANO, MÊS) */}
+           {/* 2. RELATÓRIOS TEMPORAIS */}
            {(reportType === 'evolucao' || reportType === 'por_ano' || reportType === 'ticket_periodo') && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50">
@@ -371,6 +340,17 @@ const Reports: React.FC = () => {
            {reportType === 'por_cliente' && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                   <tr className="no-print header-filter-row">
+                      <th className="px-8 py-2">
+                         <input 
+                           value={searchTerm} 
+                           onChange={e => setSearchTerm(e.target.value)} 
+                           placeholder="Filtrar Cliente..." 
+                           className="w-full h-8 bg-white dark:bg-slate-800 border-none rounded-lg text-[10px] font-black uppercase px-3" 
+                         />
+                      </th>
+                      <th className="px-8 py-2 text-center" colSpan={3}></th>
+                   </tr>
                   <tr>
                     <th className="px-8 py-5">Cliente</th>
                     <th className="px-8 py-5 text-center">Frequência</th>
@@ -391,10 +371,47 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 4. RELATÓRIO: ANALÍTICO DE VENDAS */}
+           {/* 4. RELATÓRIO: ANALÍTICO DE VENDAS COM FILTROS DE CABEÇALHO */}
            {reportType === 'por_vendas' && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                  {/* LINHA DE FILTROS INTEGRADA */}
+                  <tr className="no-print header-filter-row bg-slate-100/50 dark:bg-slate-800">
+                    <th className="px-6 py-2"></th>
+                    <th className="px-6 py-2">
+                       <select 
+                         value={filterStore} 
+                         onChange={e => setFilterStore(e.target.value)}
+                         className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-2"
+                       >
+                         {availableStores.map(s => <option key={s} value={s}>{s === 'Todas' ? 'Todas Lojas' : s}</option>)}
+                       </select>
+                    </th>
+                    <th className="px-6 py-2">
+                       <input 
+                         value={filterCustomer} 
+                         onChange={e => setFilterCustomer(e.target.value)}
+                         placeholder="Buscar Cliente..." 
+                         className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-3"
+                       />
+                    </th>
+                    <th className="px-6 py-2">
+                       <select 
+                         value={filterPayment} 
+                         onChange={e => setFilterPayment(e.target.value)}
+                         className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-2"
+                       >
+                         <option value="Todos">Todos Pagtos</option>
+                         <option value="Dinheiro">Dinheiro</option>
+                         <option value="Pix">Pix</option>
+                         <option value="Debito">Débito</option>
+                         <option value="Credito">Crédito</option>
+                       </select>
+                    </th>
+                    <th className="px-6 py-2 text-right">
+                       <button onClick={() => { setFilterStore('Todas'); setFilterCustomer(''); setFilterPayment('Todos'); }} className="text-[8px] font-black uppercase text-primary hover:underline">Limpar</button>
+                    </th>
+                  </tr>
                   <tr>
                     <th className="px-6 py-4">Data</th>
                     <th className="px-6 py-4">Loja/Unidade</th>
@@ -417,10 +434,30 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 5. RELATÓRIO: PRODUTOS / MARGEM BRUTA / SERVIÇOS */}
+           {/* 5. RELATÓRIO: PRODUTOS / MARGEM BRUTA */}
            {(reportType === 'por_produto' || reportType === 'margem_bruta' || reportType === 'por_servico') && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                  <tr className="no-print header-filter-row bg-slate-100/50 dark:bg-slate-800">
+                    <th className="px-8 py-2">
+                       <input 
+                         value={searchTerm} 
+                         onChange={e => setSearchTerm(e.target.value)}
+                         placeholder="Filtrar por nome ou SKU..." 
+                         className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-3"
+                       />
+                    </th>
+                    <th className="px-8 py-2">
+                       <select 
+                         value={filterCategory} 
+                         onChange={e => setFilterCategory(e.target.value)}
+                         className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-2"
+                       >
+                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                       </select>
+                    </th>
+                    <th className="px-8 py-2" colSpan={reportType === 'margem_bruta' ? 3 : 1}></th>
+                  </tr>
                   <tr>
                     <th className="px-8 py-5">Produto / Mão de Obra</th>
                     <th className="px-8 py-5 text-center">Qtd. Vendida</th>
@@ -455,10 +492,23 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 6. RELATÓRIO: ENTREGA FUTURA (OS PENDENTES) */}
+           {/* 6. RELATÓRIO: ENTREGA FUTURA */}
            {reportType === 'entrega_futura' && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                   <tr className="no-print header-filter-row bg-slate-100/50 dark:bg-slate-800">
+                      <th className="px-8 py-2"></th>
+                      <th className="px-8 py-2"></th>
+                      <th className="px-8 py-2">
+                         <input 
+                           value={searchTerm} 
+                           onChange={e => setSearchTerm(e.target.value)}
+                           placeholder="Filtrar por Cliente..." 
+                           className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-3"
+                         />
+                      </th>
+                      <th className="px-8 py-2" colSpan={2}></th>
+                   </tr>
                   <tr>
                     <th className="px-8 py-5">ID Ordem</th>
                     <th className="px-8 py-5">Abertura</th>
@@ -481,48 +531,10 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 7. RELATÓRIO: DESEMPENHO VENDEDOR */}
-           {(reportType === 'por_vendedor' || reportType === 'ticket_vendedor') && (
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
-                  <tr>
-                    <th className="px-8 py-5">Vendedor</th>
-                    <th className="px-8 py-5 text-center">Qtd. Vendas</th>
-                    <th className="px-8 py-5 text-center">Itens Vendidos</th>
-                    <th className="px-8 py-5 text-right">Ticket Médio</th>
-                    <th className="px-8 py-5 text-right">Total Faturado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {vendorStats.map((v, i) => (
-                    <tr key={i} className="font-bold hover:bg-slate-50 transition-all">
-                      <td className="px-8 py-5 uppercase">{v.name}</td>
-                      <td className="px-8 py-5 text-center tabular-nums">{v.count}</td>
-                      <td className="px-8 py-5 text-center tabular-nums">{v.items}</td>
-                      <td className="px-8 py-5 text-right text-amber-500 font-black tabular-nums">R$ {(v.total / v.count).toLocaleString('pt-BR')}</td>
-                      <td className="px-8 py-5 text-right text-primary font-black tabular-nums">R$ {v.total.toLocaleString('pt-BR')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           )}
-
-           {(periodSales.length === 0 && (reportType === 'por_vendas' || reportType === 'evolucao')) && (
+           {(periodSales.length === 0) && (
               <div className="py-32 text-center no-print">
                  <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">query_stats</span>
                  <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhum dado localizado para os filtros atuais</p>
-              </div>
-           )}
-           {(reportType === 'por_produto' || reportType === 'margem_bruta') && productsStats.length === 0 && (
-              <div className="py-32 text-center no-print">
-                 <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">inventory_2</span>
-                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhum produto encontrado com estes filtros</p>
-              </div>
-           )}
-           {reportType === 'entrega_futura' && futureDeliveries.length === 0 && (
-              <div className="py-32 text-center no-print">
-                 <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">verified</span>
-                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhuma Entrega Futura pendente para este período</p>
               </div>
            )}
         </div>
