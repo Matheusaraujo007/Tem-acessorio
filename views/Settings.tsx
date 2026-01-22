@@ -60,6 +60,10 @@ const Settings: React.FC = () => {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userForm.password && !userForm.id) {
+      alert("A senha é obrigatória para novos colaboradores!");
+      return;
+    }
     const newUser: User = {
       ...userForm as User,
       id: userForm.id || `user-${Date.now()}`,
@@ -269,23 +273,39 @@ const Settings: React.FC = () => {
       {showUserModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary text-white">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center">
                  <h3 className="text-2xl font-black uppercase">Colaborador</h3>
                  <button onClick={() => setShowUserModal(false)}><span className="material-symbols-outlined">close</span></button>
               </div>
               <form onSubmit={handleSaveUser} className="p-10 space-y-4">
-                 <input placeholder="Nome" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" required />
-                 <input placeholder="E-mail" type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" required />
-                 <select value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" required>
-                    <option value="">Selecione a Unidade</option>
-                    {establishments.map(est => <option key={est.id} value={est.id}>{est.name}</option>)}
-                 </select>
-                 <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none">
-                    <option value={UserRole.VENDOR}>VENDEDOR</option>
-                    <option value={UserRole.MANAGER}>GERENTE</option>
-                    <option value={UserRole.CASHIER}>CAIXA</option>
-                    <option value={UserRole.ADMIN}>ADMINISTRADOR</option>
-                 </select>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Completo</label>
+                    <input placeholder="Ex: Carlos Silva" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none uppercase" required />
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">E-mail de Acesso</label>
+                    <input placeholder="Ex: carlos@loja.com" type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" required />
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Senha de Login</label>
+                    <input placeholder="Digite a senha" type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" required={!userForm.id} />
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Unidade / Loja</label>
+                    <select value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" required>
+                       <option value="">Selecione a Unidade</option>
+                       {establishments.map(est => <option key={est.id} value={est.id}>{est.name}</option>)}
+                    </select>
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Cargo / Função</label>
+                    <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none">
+                       <option value={UserRole.VENDOR}>VENDEDOR</option>
+                       <option value={UserRole.MANAGER}>GERENTE</option>
+                       <option value={UserRole.CASHIER}>CAIXA</option>
+                       <option value={UserRole.ADMIN}>ADMINISTRADOR</option>
+                    </select>
+                 </div>
                  <div className="p-4 bg-emerald-500/10 rounded-2xl space-y-3">
                     <div className="flex justify-between items-center">
                        <span className="text-[10px] font-black uppercase">Comissão Ativa?</span>
@@ -302,7 +322,7 @@ const Settings: React.FC = () => {
       {showStoreModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-900 text-white">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-900 text-white flex justify-between items-center">
                  <h3 className="text-2xl font-black uppercase">Nova Unidade</h3>
                  <button onClick={() => setShowStoreModal(false)}><span className="material-symbols-outlined">close</span></button>
               </div>

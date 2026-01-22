@@ -20,13 +20,17 @@ const PDV: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showTerminalMenu, setShowTerminalMenu] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
   
   const [successType, setSuccessType] = useState<'SALE' | 'OS' | 'RETURN' | 'CANCEL'>('SALE');
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [lastSaleData, setLastSaleData] = useState<any>(null);
+
+  // Senha do Usuário
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Campos OS
   const [osDescription, setOsDescription] = useState('');
@@ -174,6 +178,24 @@ const PDV: React.FC = () => {
       setShowSuccessModal(true);
     } catch (error) {
       alert("Erro ao gerar Ordem de Serviço.");
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (newPassword !== confirmPassword) {
+      alert("As senhas não conferem!");
+      return;
+    }
+    try {
+      await addUser({ ...currentUser, password: newPassword });
+      alert("Senha alterada com sucesso!");
+      setShowPasswordChangeModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e) {
+      alert("Erro ao atualizar senha.");
     }
   };
 
@@ -333,9 +355,12 @@ const PDV: React.FC = () => {
                 {currentStore.logoUrl ? <img src={currentStore.logoUrl} className="size-full object-cover" alt="Terminal Logo" /> : <span className="material-symbols-outlined">point_of_sale</span>}
              </div>
              {showTerminalMenu && (
-               <div className="absolute top-14 left-0 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-3 z-[100] animate-in slide-in-from-top-2 duration-200">
-                  <button onClick={() => logoInputRef.current?.click()} className="w-full px-4 py-3 flex items-center gap-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left uppercase">
+               <div className="absolute top-14 left-0 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-2 z-[100] animate-in slide-in-from-top-2 duration-200">
+                  <button onClick={() => logoInputRef.current?.click()} className="w-full px-4 py-2.5 flex items-center gap-3 text-[10px] font-black text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left uppercase">
                     <span className="material-symbols-outlined text-lg text-primary">add_a_photo</span> Alterar Logotipo
+                  </button>
+                  <button onClick={() => { setShowPasswordChangeModal(true); setShowTerminalMenu(false); }} className="w-full px-4 py-2.5 flex items-center gap-3 text-[10px] font-black text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left uppercase border-t border-slate-50 dark:border-slate-700">
+                    <span className="material-symbols-outlined text-lg text-amber-500">lock_reset</span> Alterar Minha Senha
                   </button>
                </div>
              )}
@@ -454,6 +479,29 @@ const PDV: React.FC = () => {
           </div>
         </aside>
       </main>
+
+      {/* MODAL ALTERAR SENHA PRÓPRIA */}
+      {showPasswordChangeModal && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+             <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-amber-500 text-white flex justify-between items-center">
+                <h3 className="text-xl font-black uppercase tracking-tight">Segurança: Alterar Senha</h3>
+                <button onClick={() => setShowPasswordChangeModal(false)}><span className="material-symbols-outlined">close</span></button>
+             </div>
+             <form onSubmit={handleUpdatePassword} className="p-10 space-y-5">
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nova Senha</label>
+                   <input required value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" placeholder="••••••••" />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirmar Nova Senha</label>
+                   <input required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} type="password" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" placeholder="••••••••" />
+                </div>
+                <button type="submit" className="w-full h-16 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl">Atualizar Minha Senha</button>
+             </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL CHECKOUT */}
       {showCheckout && (
