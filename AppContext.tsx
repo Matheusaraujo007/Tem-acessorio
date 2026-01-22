@@ -45,16 +45,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const DEFAULT_USER: User = {
-  id: 'admin-01',
-  name: 'Administrador Sistema',
-  email: 'admin@erp.com',
-  role: UserRole.ADMIN,
-  storeId: 'matriz',
-  active: true,
-  avatar: 'https://picsum.photos/seed/admin/100/100'
-};
-
 const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
   [UserRole.ADMIN]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true },
   [UserRole.MANAGER]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true },
@@ -63,7 +53,8 @@ const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(DEFAULT_USER);
+  // Alterado para null para exigir login
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [rolePermissions, setRolePermissions] = useState<Record<UserRole, RolePermissions>>(INITIAL_PERMS);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
@@ -139,7 +130,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue: number = 0, cardDetails?: any) => {
-    // 1. Atualiza estoque de produtos físicos
     for (const item of items) {
        const p = products.find(x => x.id === item.id);
        if (p && !p.isService) {
@@ -147,11 +137,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
        }
     }
 
-    // 2. Localiza nomes para transação
     const client = customers.find(c => c.id === clientId);
     const storeObj = establishments.find(e => e.id === currentUser?.storeId);
 
-    // 3. Cria a transação de entrada
     await addTransaction({
       id: `SALE-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
