@@ -86,8 +86,6 @@ const PDV: React.FC = () => {
 
   const vendors = useMemo(() => {
     return users.filter(u => {
-      // Regra de Vendedores: Admins veem todos os vendedores de todas as unidades
-      // Outros veem apenas os da sua própria unidade
       const isCorrectRole = (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
       const isVisibleForUser = isAdmin || u.storeId === currentUser?.storeId;
       return isCorrectRole && isVisibleForUser;
@@ -454,7 +452,7 @@ const PDV: React.FC = () => {
                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor</label>
                    <select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
                       <option value="">Selecione Vendedor</option>
-                      {vendors.map(v => <option key={v.id} value={v.id}>{v.name} ({v.storeId})</option>)}
+                      {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                    </select>
                 </div>
                 <div className="space-y-1.5">

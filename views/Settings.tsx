@@ -176,9 +176,16 @@ const Settings: React.FC = () => {
                  <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-800/50"><tr className="border-b border-slate-100 dark:border-slate-800"><th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400">Nome / E-mail</th><th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400">Acesso / Unidade</th><th className="px-10 py-6 text-[10px] font-black uppercase text-slate-400 text-right">Ações</th></tr></thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                       {filteredUsers.map(u => (
-                          <tr key={u.id} className="hover:bg-slate-50 transition-all"><td className="px-10 py-6"><p className="text-sm font-black uppercase">{u.name}</p><p className="text-[10px] text-slate-400">{u.email}</p></td><td className="px-10 py-6"><span className="text-[10px] font-black uppercase text-primary bg-primary/10 px-3 py-1 rounded-lg">{u.role}</span><p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">{u.storeId}</p></td><td className="px-10 py-6 text-right"><button onClick={() => { setUserForm(u); setShowUserModal(true); }} className="size-10 bg-slate-100 dark:bg-slate-800 rounded-xl"><span className="material-symbols-outlined text-lg">edit</span></button></td></tr>
-                       ))}
+                       {filteredUsers.map(u => {
+                          const store = establishments.find(e => e.id === u.storeId);
+                          return (
+                            <tr key={u.id} className="hover:bg-slate-50 transition-all">
+                              <td className="px-10 py-6"><p className="text-sm font-black uppercase">{u.name}</p><p className="text-[10px] text-slate-400">{u.email}</p></td>
+                              <td className="px-10 py-6"><span className="text-[10px] font-black uppercase text-primary bg-primary/10 px-3 py-1 rounded-lg">{u.role}</span><p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">{store?.name || u.storeId}</p></td>
+                              <td className="px-10 py-6 text-right"><button onClick={() => { setUserForm(u); setShowUserModal(true); }} className="size-10 bg-slate-100 dark:bg-slate-800 rounded-xl"><span className="material-symbols-outlined text-lg">edit</span></button></td>
+                            </tr>
+                          );
+                       })}
                     </tbody>
                  </table>
               </div>
