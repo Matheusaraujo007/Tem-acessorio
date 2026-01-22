@@ -43,7 +43,7 @@ const PDV: React.FC = () => {
   const [returnSearchCustomer, setReturnSearchCustomer] = useState('');
   const [cancelSearchId, setCancelSearchId] = useState('');
   const [selectedReturnCustomer, setSelectedReturnCustomer] = useState<Customer | null>(null);
-  const [customerSales, setCustomerSales] = useState<any[]>([]);
+  const [customerSales, setCustomerSales] = useState<Transaction[]>([]);
 
   // Form de novo cliente (PDV Rápido)
   const initialCustomerForm: Omit<Customer, 'id'> = { 
@@ -76,7 +76,6 @@ const PDV: React.FC = () => {
     });
   }, [search, category, products]);
 
-  // FILTRO DE VENDEDORES POR UNIDADE
   const vendors = useMemo(() => {
     return users.filter(u => 
       (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN) && 
@@ -84,7 +83,6 @@ const PDV: React.FC = () => {
     );
   }, [users, currentUser]);
 
-  // Fecha menu ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -199,6 +197,7 @@ const PDV: React.FC = () => {
     }
   };
 
+  // EFEITO DE BUSCA DE VENDAS PARA O CLIENTE SELECIONADO NA TROCA
   useEffect(() => {
     if (selectedReturnCustomer) {
       const sales = transactions.filter(t => t.clientId === selectedReturnCustomer.id && t.type === 'INCOME' && t.category === 'Venda');
@@ -208,7 +207,7 @@ const PDV: React.FC = () => {
     }
   }, [selectedReturnCustomer, transactions]);
 
-  const handleProcessReturn = async (sale: any, item: CartItem) => {
+  const handleProcessReturn = async (sale: Transaction, item: CartItem) => {
     const saleDate = new Date(sale.date);
     const today = new Date();
     const diffTime = Math.abs(today.getTime() - saleDate.getTime());
@@ -238,6 +237,7 @@ const PDV: React.FC = () => {
        });
        setSuccessType('RETURN');
        setShowReturnsModal(false);
+       setSelectedReturnCustomer(null);
        setShowSuccessModal(true);
     }
   };
@@ -479,6 +479,75 @@ const PDV: React.FC = () => {
           </div>
         </aside>
       </main>
+
+      {/* MODAL TROCAS / DEVOLUÇÕES (ADICIONADO E AJUSTADO) */}
+      {showReturnsModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[700px] animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-amber-500 text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-3"><span className="material-symbols-outlined text-3xl">assignment_return</span><h3 className="text-2xl font-black uppercase tracking-tight">Trocas & Devoluções</h3></div>
+                 <button onClick={() => { setShowReturnsModal(false); setSelectedReturnCustomer(null); }} className="size-10 bg-white/20 rounded-xl"><span className="material-symbols-outlined">close</span></button>
+              </div>
+              
+              <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                 {!selectedReturnCustomer ? (
+                    <div className="space-y-4">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Localizar Cliente por Nome ou WhatsApp</label>
+                       <div className="relative">
+                          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                          <input autoFocus placeholder="Digite para buscar..." value={returnSearchCustomer} onChange={e => setReturnSearchCustomer(e.target.value)} className="w-full h-14 bg-white dark:bg-slate-900 border-none rounded-2xl pl-12 pr-6 text-sm font-bold shadow-sm" />
+                       </div>
+                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {customers.filter(c => c.name.toLowerCase().includes(returnSearchCustomer.toLowerCase()) || c.phone.includes(returnSearchCustomer)).slice(0, 6).map(c => (
+                             <button key={c.id} onClick={() => setSelectedReturnCustomer(c)} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-700 text-left hover:border-amber-500 transition-all group">
+                                <p className="text-xs font-black uppercase truncate group-hover:text-amber-500">{c.name}</p>
+                                <p className="text-[10px] text-slate-400 font-bold">{c.phone}</p>
+                             </button>
+                          ))}
+                       </div>
+                    </div>
+                 ) : (
+                    <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className="size-12 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center font-black">{selectedReturnCustomer.name.charAt(0)}</div>
+                          <div>
+                             <p className="text-sm font-black uppercase text-slate-900 dark:text-white leading-none">{selectedReturnCustomer.name}</p>
+                             <p className="text-[10px] text-slate-400 font-bold mt-1">{selectedReturnCustomer.phone}</p>
+                          </div>
+                       </div>
+                       <button onClick={() => setSelectedReturnCustomer(null)} className="px-4 py-2 text-[9px] font-black text-amber-600 bg-amber-50 rounded-lg uppercase">Trocar Cliente</button>
+                    </div>
+                 )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                 {selectedReturnCustomer ? (
+                    customerSales.length > 0 ? (
+                       customerSales.map(sale => (
+                          <div key={sale.id} className="bg-slate-50 dark:bg-slate-800/40 rounded-[2rem] border border-slate-100 dark:border-slate-700 overflow-hidden">
+                             <div className="p-6 bg-white dark:bg-slate-900/40 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
+                                <div><p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Venda Realizada em {sale.date}</p><p className="text-xs font-black text-amber-600 uppercase">#{sale.id}</p></div>
+                                <div className="text-right"><p className="text-xs font-black text-slate-900 dark:text-white tabular-nums">Total: R$ {sale.value.toLocaleString('pt-BR')}</p></div>
+                             </div>
+                             <div className="p-6 space-y-3">
+                                {sale.items?.map(item => (
+                                   <div key={item.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700 group hover:border-amber-500 transition-all">
+                                      <div className="flex items-center gap-3 min-w-0">
+                                         <div className="size-10 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center"><span className="material-symbols-outlined text-slate-400">shopping_bag</span></div>
+                                         <div className="truncate"><p className="text-xs font-black uppercase truncate">{item.name}</p><p className="text-[10px] text-slate-400 font-bold tabular-nums">{item.quantity}x • R$ {item.salePrice.toLocaleString('pt-BR')}</p></div>
+                                      </div>
+                                      <button onClick={() => handleProcessReturn(sale, item)} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase hover:bg-amber-600 transition-all">Devolver Item</button>
+                                   </div>
+                                ))}
+                             </div>
+                          </div>
+                       ))
+                    ) : <div className="text-center py-20 opacity-20 uppercase font-black text-xs tracking-[0.2em]">Nenhum histórico de vendas localizado</div>
+                 ) : <div className="text-center py-32 opacity-20 uppercase font-black text-xs tracking-[0.2em] flex flex-col items-center gap-4"><span className="material-symbols-outlined text-6xl">person_search</span>Selecione um cliente acima para iniciar</div>}
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* MODAL ALTERAR SENHA PRÓPRIA */}
       {showPasswordChangeModal && (
