@@ -23,6 +23,7 @@ const Reports: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStore, setFilterStore] = useState('Todas');
   const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterVendor, setFilterVendor] = useState('');
   const [filterCategory, setFilterCategory] = useState('Todas');
   const [filterPayment, setFilterPayment] = useState('Todos');
 
@@ -38,7 +39,7 @@ const Reports: React.FC = () => {
     return ['Todas', ...Array.from(new Set(establishments.map(e => e.name)))];
   }, [establishments]);
 
-  // Filtro base de transações (Refatorado para filtros granulares)
+  // Filtro base de transações
   const periodSales = useMemo(() => {
     return (transactions || []).filter(t => {
       // 1. Filtro de Segurança/Escopo de Unidade
@@ -53,7 +54,7 @@ const Reports: React.FC = () => {
       const inRange = t.date >= startDate && t.date <= endDate;
       if (!inRange) return false;
       
-      // 4. Filtro por Loja Específica (Selecionada no cabeçalho)
+      // 4. Filtro por Loja Específica
       const matchesStore = filterStore === 'Todas' || t.store === filterStore;
       if (!matchesStore) return false;
 
@@ -61,15 +62,21 @@ const Reports: React.FC = () => {
       const matchesPayment = filterPayment === 'Todos' || t.method === filterPayment;
       if (!matchesPayment) return false;
       
-      // 6. Filtro por Cliente (Busca Textual)
-      const targetCustomer = filterCustomer || searchTerm; // Usa o específico ou o geral
+      // 6. Filtro por Cliente
+      const targetCustomer = filterCustomer || searchTerm;
       const matchesCustomer = targetCustomer === '' || 
         (t.client?.toLowerCase().includes(targetCustomer.toLowerCase()));
       if (!matchesCustomer) return false;
 
+      // 7. Filtro por Vendedor (Novo)
+      if (filterVendor !== '') {
+        const vName = users.find(u => u.id === t.vendorId)?.name || 'Balcão / Sistema';
+        if (!vName.toLowerCase().includes(filterVendor.toLowerCase())) return false;
+      }
+
       return true;
     });
-  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore, filterPayment, filterCustomer, searchTerm]);
+  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore, filterPayment, filterCustomer, searchTerm, filterVendor, users]);
 
   // --- LÓGICAS DE AGRUPAMENTO ---
 
@@ -123,6 +130,7 @@ const Reports: React.FC = () => {
     periodSales.forEach(s => {
       const vid = s.vendorId || 'balcao';
       const vname = users.find(u => u.id === s.vendorId)?.name || 'Balcão / Sistema';
+      
       if (!map[vid]) map[vid] = { name: vname, total: 0, count: 0, items: 0 };
       map[vid].total += s.value;
       map[vid].count += 1;
@@ -267,7 +275,7 @@ const Reports: React.FC = () => {
           <ReportKPICard title="Ticket Médio" value={`R$ ${globalAvgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="payments" color="text-primary" />
           <ReportKPICard title="Faturamento Bruto" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="trending_up" color="text-emerald-500" />
           <ReportKPICard title="Operações" value={periodSales.length.toString()} icon="shopping_bag" color="text-amber-500" />
-          <ReportKPICard title="Itens Únicos" value={(reportType === 'por_produto' || reportType === 'margem_bruta' ? productsStats.length : customerRanking.length).toString()} icon="layers" color="text-blue-500" />
+          <ReportKPICard title="Itens/Clientes" value={(reportType === 'por_produto' ? productsStats.length : customerRanking.length).toString()} icon="layers" color="text-blue-500" />
         </div>
 
         {/* TABELA DE DADOS DINÂMICA */}
@@ -340,13 +348,13 @@ const Reports: React.FC = () => {
            {reportType === 'por_cliente' && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
-                   <tr className="no-print header-filter-row">
+                   <tr className="no-print header-filter-row bg-slate-100/50 dark:bg-slate-800">
                       <th className="px-8 py-2">
                          <input 
                            value={searchTerm} 
                            onChange={e => setSearchTerm(e.target.value)} 
                            placeholder="Filtrar Cliente..." 
-                           className="w-full h-8 bg-white dark:bg-slate-800 border-none rounded-lg text-[10px] font-black uppercase px-3" 
+                           className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-3 focus:ring-2 focus:ring-primary/20 transition-all" 
                          />
                       </th>
                       <th className="px-8 py-2 text-center" colSpan={3}></th>
@@ -371,11 +379,10 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 4. RELATÓRIO: ANALÍTICO DE VENDAS COM FILTROS DE CABEÇALHO */}
+           {/* 4. RELATÓRIO: ANALÍTICO DE VENDAS */}
            {reportType === 'por_vendas' && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
-                  {/* LINHA DE FILTROS INTEGRADA */}
                   <tr className="no-print header-filter-row bg-slate-100/50 dark:bg-slate-800">
                     <th className="px-6 py-2"></th>
                     <th className="px-6 py-2">
@@ -434,7 +441,44 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 5. RELATÓRIO: PRODUTOS / MARGEM BRUTA */}
+           {/* 5. RELATÓRIO: VENDEDORES (DESEMPENHO E TICKET MÉDIO) */}
+           {(reportType === 'por_vendedor' || reportType === 'ticket_vendedor') && (
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                   <tr className="no-print header-filter-row bg-slate-100/50 dark:bg-slate-800">
+                      <th className="px-8 py-2">
+                         <input 
+                           value={filterVendor} 
+                           onChange={e => setFilterVendor(e.target.value)}
+                           placeholder="Buscar Vendedor..." 
+                           className="w-full h-8 bg-white dark:bg-slate-700 border-none rounded-lg text-[9px] font-black uppercase px-3 focus:ring-2 focus:ring-primary/20 transition-all"
+                         />
+                      </th>
+                      <th className="px-8 py-2" colSpan={4}></th>
+                   </tr>
+                  <tr>
+                    <th className="px-8 py-5">Vendedor</th>
+                    <th className="px-8 py-5 text-center">Qtd. Vendas</th>
+                    <th className="px-8 py-5 text-center">Itens Vendidos</th>
+                    <th className="px-8 py-5 text-right">Ticket Médio</th>
+                    <th className="px-8 py-5 text-right">Total Faturado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {vendorStats.map((v, i) => (
+                    <tr key={i} className="font-bold hover:bg-slate-50 transition-all">
+                      <td className="px-8 py-5 uppercase">{v.name}</td>
+                      <td className="px-8 py-5 text-center tabular-nums">{v.count}</td>
+                      <td className="px-8 py-5 text-center tabular-nums">{v.items}</td>
+                      <td className="px-8 py-5 text-right text-amber-500 font-black tabular-nums">R$ {(v.total / (v.count || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-8 py-5 text-right text-primary font-black tabular-nums">R$ {v.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+           )}
+
+           {/* 6. RELATÓRIO: PRODUTOS / MARGEM BRUTA */}
            {(reportType === 'por_produto' || reportType === 'margem_bruta' || reportType === 'por_servico') && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
@@ -492,7 +536,7 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {/* 6. RELATÓRIO: ENTREGA FUTURA */}
+           {/* 7. RELATÓRIO: ENTREGA FUTURA */}
            {reportType === 'entrega_futura' && (
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
