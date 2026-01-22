@@ -12,7 +12,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toLocaleDateString('en-CA');
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
 
@@ -28,7 +28,6 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     client: ''
   });
 
-  // RESTRIÇÃO POR UNIDADE: Filtra transações pela loja do usuário
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => t.type === type && (isAdmin || t.store === currentStore?.name));
   }, [transactions, type, isAdmin, currentStore]);
@@ -41,7 +40,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       description: '',
       store: currentStore?.name || 'Geral',
       category: '',
-      status: type === 'INCOME' ? TransactionStatus.APPROVED : TransactionStatus.PENDING,
+      status: type === 'INCOME' ? TransactionStatus.PAID : TransactionStatus.PENDING,
       value: 0,
       method: '',
       client: '',
@@ -54,7 +53,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     e.preventDefault();
     addTransaction({
       ...form as Transaction,
-      id: editingId || `TRX-${Math.floor(Math.random() * 100000)}`,
+      id: editingId || `TRX-${Date.now()}`, // Inclui timestamp para o Dashboard
       type: type,
       store: currentStore?.name || 'Principal'
     });

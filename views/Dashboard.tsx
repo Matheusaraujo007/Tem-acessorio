@@ -7,6 +7,7 @@ import { UserRole, Transaction } from '../types';
 const Dashboard: React.FC = () => {
   const { transactions, products, currentUser, establishments, users, refreshData } = useApp();
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'yesterday' | 'beforeYesterday'>('today');
 
   // Auto-refresh a cada 10 segundos chamando a API real
   useEffect(() => {
@@ -19,17 +20,35 @@ const Dashboard: React.FC = () => {
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
   const currentStoreName = currentStore?.name || '';
-  const today = new Date().toISOString().split('T')[0];
+  
+  // Datas formatadas (YYYY-MM-DD)
+  const dates = useMemo(() => {
+    const now = new Date();
+    
+    const d0 = new Date(now);
+    const d1 = new Date(now);
+    d1.setDate(d1.getDate() - 1);
+    const d2 = new Date(now);
+    d2.setDate(d2.getDate() - 2);
 
-  // FILTRO ESTRITAMENTE POR UNIDADE (ou Global para Admin)
+    return {
+      today: d0.toLocaleDateString('en-CA'),
+      yesterday: d1.toLocaleDateString('en-CA'),
+      beforeYesterday: d2.toLocaleDateString('en-CA')
+    };
+  }, []);
+
+  const activeDate = dates[selectedPeriod];
+
+  // FILTRO ESTRITAMENTE POR UNIDADE E DATA SELECIONADA
   const dailyTransactions = useMemo(() => {
     return (transactions || []).filter(t => 
-      t.date === today && 
+      t.date === activeDate && 
       t.type === 'INCOME' && 
       (t.category === 'Venda' || t.category === 'Serviço') &&
       (isAdmin || t.store === currentStoreName)
     );
-  }, [transactions, isAdmin, currentStoreName, today]);
+  }, [transactions, isAdmin, currentStoreName, activeDate]);
 
   // Lógica de Reação/Emoji (Ticket Médio)
   const getReaction = (val: number) => {
@@ -58,17 +77,18 @@ const Dashboard: React.FC = () => {
 
   // Vendas por Hora
   const hourlyData = useMemo(() => {
-    const hoursMap: Record<string, number> = {
-      '08:00': 0, '09:00': 0, '10:00': 0, '11:00': 0, '12:00': 0, 
-      '13:00': 0, '14:00': 0, '15:00': 0, '16:00': 0, '17:00': 0, '18:00': 0
-    };
+    const hoursMap: Record<string, number> = {};
+    for (let i = 7; i <= 22; i++) {
+      hoursMap[`${i.toString().padStart(2, '0')}:00`] = 0;
+    }
 
     dailyTransactions.forEach(t => {
       const parts = t.id.split('-');
       if (parts.length > 1) {
         const timestamp = parseInt(parts[1]);
         if (!isNaN(timestamp)) {
-          const hour = new Date(timestamp).getHours();
+          const dateObj = new Date(timestamp);
+          const hour = dateObj.getHours();
           const hourKey = `${hour.toString().padStart(2, '0')}:00`;
           if (hoursMap[hourKey] !== undefined) {
             hoursMap[hourKey] += t.value;
@@ -80,7 +100,7 @@ const Dashboard: React.FC = () => {
     return Object.entries(hoursMap).map(([hour, value]) => ({ hour, value }));
   }, [dailyTransactions]);
 
-  // Lista de Produtos Vendidos (Filtrado por Loja)
+  // Lista de Produtos Vendidos (Ranking)
   const soldProductsList = useMemo(() => {
     const map: Record<string, any> = {};
     
@@ -107,16 +127,14 @@ const Dashboard: React.FC = () => {
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [dailyTransactions, products]);
 
-  // Desempenho de Vendedores (Apenas da Unidade se não for Admin)
+  // Desempenho de Vendedores
   const vendorPerformance = useMemo(() => {
     const perf: Record<string, any> = {};
-    
-    // Filtramos os usuários da mesma unidade primeiro
     const relevantUsers = users.filter(u => isAdmin || u.storeId === currentUser?.storeId);
 
     dailyTransactions.forEach(t => {
       const vendor = relevantUsers.find(u => u.id === t.vendorId);
-      if (!vendor && !isAdmin) return; // Ignora vendas de outras lojas se vazar
+      if (!vendor && !isAdmin) return;
 
       const vName = vendor?.name || 'Balcão/Geral';
       const vKey = t.vendorId || 'none';
@@ -144,28 +162,44 @@ const Dashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-6 animate-in fade-in duration-700 bg-[#f4f7f9] dark:bg-background-dark min-h-screen">
       
-      {/* SEÇÃO SUPERIOR */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* RESUMO DIÁRIO */}
         <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-           <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+           <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col gap-3 bg-slate-50/50 dark:bg-slate-800/50">
               <h4 className="text-[10px] font-black uppercase text-slate-500">
                 {isAdmin ? 'Resumo Global' : `Unidade: ${currentStoreName}`}
               </h4>
-              <div className="flex gap-1">
-                 <button className="px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg uppercase">Hoje</button>
+              <div className="flex gap-1 bg-slate-200/50 dark:bg-slate-700/50 p-1 rounded-xl">
+                 <button 
+                  onClick={() => setSelectedPeriod('today')}
+                  className={`flex-1 px-2 py-1.5 text-[9px] font-black rounded-lg uppercase transition-all ${selectedPeriod === 'today' ? 'bg-primary text-white shadow-md' : 'text-slate-500'}`}
+                 >
+                   Hoje
+                 </button>
+                 <button 
+                  onClick={() => setSelectedPeriod('yesterday')}
+                  className={`flex-1 px-2 py-1.5 text-[9px] font-black rounded-lg uppercase transition-all ${selectedPeriod === 'yesterday' ? 'bg-primary text-white shadow-md' : 'text-slate-500'}`}
+                 >
+                   Ontem
+                 </button>
+                 <button 
+                  onClick={() => setSelectedPeriod('beforeYesterday')}
+                  className={`flex-1 px-2 py-1.5 text-[9px] font-black rounded-lg uppercase transition-all ${selectedPeriod === 'beforeYesterday' ? 'bg-primary text-white shadow-md' : 'text-slate-500'}`}
+                 >
+                   Ant.
+                 </button>
               </div>
            </div>
            
            <div className="p-6 space-y-8 flex-1">
               <div className="flex justify-between items-start">
                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Total de vendas</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Total {selectedPeriod !== 'today' ? 'no dia' : 'hoje'}</p>
                     <h2 className="text-3xl font-black text-rose-600 tabular-nums">R$ {dailyMetrics.totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
                  </div>
                  <div className="text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Status</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase">Clima</p>
                     <div className="text-3xl">{getReaction(dailyMetrics.avgTicket).emoji}</div>
                  </div>
               </div>
@@ -190,7 +224,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div className="pt-6 mt-auto border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                 <p className="text-[9px] font-bold text-slate-400 uppercase">Sinc: {lastUpdate.toLocaleTimeString()}</p>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase">Ref: {activeDate}</p>
                  <span className="text-[8px] font-black text-emerald-500 uppercase animate-pulse">● Live Data</span>
               </div>
            </div>
@@ -199,7 +233,7 @@ const Dashboard: React.FC = () => {
         {/* VENDAS POR HORA */}
         <div className="lg:col-span-9 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fluxo de Vendas (Hora em Hora)</h4>
+              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fluxo de Vendas - {activeDate}</h4>
               <div className="flex gap-2">
                  <span className="material-symbols-outlined text-slate-300 text-lg">timeline</span>
               </div>
@@ -225,13 +259,11 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* SEÇÃO INFERIOR */}
+      {/* Ranking e Equipe */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* PRODUTOS VENDIDOS */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
-              <h4 className="text-[10px] font-black uppercase text-slate-500">Ranking de Itens Vendidos</h4>
+              <h4 className="text-[10px] font-black uppercase text-slate-500">Ranking de Itens em {activeDate}</h4>
            </div>
            <div className="overflow-auto flex-1 custom-scrollbar">
               <table className="w-full text-left">
@@ -257,10 +289,9 @@ const Dashboard: React.FC = () => {
            </div>
         </div>
 
-        {/* DESEMPENHO DE VENDEDORES */}
         <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
-              <h4 className="text-[10px] font-black uppercase text-slate-500">Performance da Equipe</h4>
+              <h4 className="text-[10px] font-black uppercase text-slate-500">Performance da Equipe ({activeDate})</h4>
            </div>
            <div className="overflow-auto flex-1 custom-scrollbar">
               <table className="w-full text-left">
@@ -287,7 +318,6 @@ const Dashboard: React.FC = () => {
               </table>
            </div>
         </div>
-
       </div>
 
       <style>{`
