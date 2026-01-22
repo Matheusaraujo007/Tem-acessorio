@@ -21,12 +21,12 @@ const Dashboard: React.FC = () => {
   const currentStoreName = currentStore?.name || '';
   const today = new Date().toISOString().split('T')[0];
 
-  // Filtro de Transações Reais do Dia
+  // FILTRO ESTRITAMENTE POR UNIDADE (ou Global para Admin)
   const dailyTransactions = useMemo(() => {
     return (transactions || []).filter(t => 
       t.date === today && 
       t.type === 'INCOME' && 
-      t.category === 'Venda' &&
+      (t.category === 'Venda' || t.category === 'Serviço') &&
       (isAdmin || t.store === currentStoreName)
     );
   }, [transactions, isAdmin, currentStoreName, today]);
@@ -40,7 +40,7 @@ const Dashboard: React.FC = () => {
     return { emoji: '🤩', label: 'Excelente' };
   };
 
-  // Cálculos do Resumo Diário Baseado no Banco
+  // Cálculos do Resumo Diário
   const dailyMetrics = useMemo(() => {
     const totalSales = dailyTransactions.reduce((acc, t) => acc + t.value, 0);
     const qtySales = dailyTransactions.length;
@@ -56,7 +56,7 @@ const Dashboard: React.FC = () => {
     return { totalSales, qtySales, qtyProducts, avgTicket, prodsPerSale };
   }, [dailyTransactions]);
 
-  // Vendas Reais por Hora (Extraindo do ID da transação)
+  // Vendas por Hora
   const hourlyData = useMemo(() => {
     const hoursMap: Record<string, number> = {
       '08:00': 0, '09:00': 0, '10:00': 0, '11:00': 0, '12:00': 0, 
@@ -64,7 +64,6 @@ const Dashboard: React.FC = () => {
     };
 
     dailyTransactions.forEach(t => {
-      // Tenta extrair timestamp do ID (SALE-123456789)
       const parts = t.id.split('-');
       if (parts.length > 1) {
         const timestamp = parseInt(parts[1]);
@@ -81,7 +80,7 @@ const Dashboard: React.FC = () => {
     return Object.entries(hoursMap).map(([hour, value]) => ({ hour, value }));
   }, [dailyTransactions]);
 
-  // Lista de Produtos Vendidos (Tabela Inferior Esquerda)
+  // Lista de Produtos Vendidos (Filtrado por Loja)
   const soldProductsList = useMemo(() => {
     const map: Record<string, any> = {};
     
@@ -101,19 +100,24 @@ const Dashboard: React.FC = () => {
           };
         }
         map[item.id].qty += item.quantity;
-        map[item.id].total += (item.quantity * item.salePrice);
+        map[item.id].total += (item.quantity * (item.salePrice || 0));
       });
     });
 
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [dailyTransactions, products]);
 
-  // Desempenho de Vendedores Real (Tabela Inferior Direita)
+  // Desempenho de Vendedores (Apenas da Unidade se não for Admin)
   const vendorPerformance = useMemo(() => {
     const perf: Record<string, any> = {};
     
+    // Filtramos os usuários da mesma unidade primeiro
+    const relevantUsers = users.filter(u => isAdmin || u.storeId === currentUser?.storeId);
+
     dailyTransactions.forEach(t => {
-      const vendor = users.find(u => u.id === t.vendorId);
+      const vendor = relevantUsers.find(u => u.id === t.vendorId);
+      if (!vendor && !isAdmin) return; // Ignora vendas de outras lojas se vazar
+
       const vName = vendor?.name || 'Balcão/Geral';
       const vKey = t.vendorId || 'none';
 
@@ -135,7 +139,7 @@ const Dashboard: React.FC = () => {
         reaction: getReaction(ticket)
       };
     }).sort((a, b) => b.total - a.total);
-  }, [dailyTransactions, users]);
+  }, [dailyTransactions, users, isAdmin, currentUser]);
 
   return (
     <div className="p-6 space-y-6 animate-in fade-in duration-700 bg-[#f4f7f9] dark:bg-background-dark min-h-screen">
@@ -146,10 +150,11 @@ const Dashboard: React.FC = () => {
         {/* RESUMO DIÁRIO */}
         <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-              <h4 className="text-[10px] font-black uppercase text-slate-500">Resumo de vendas diário</h4>
+              <h4 className="text-[10px] font-black uppercase text-slate-500">
+                {isAdmin ? 'Resumo Global' : `Unidade: ${currentStoreName}`}
+              </h4>
               <div className="flex gap-1">
                  <button className="px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg uppercase">Hoje</button>
-                 <button className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-500 text-[9px] font-black rounded-lg uppercase">Ontem</button>
               </div>
            </div>
            
@@ -179,14 +184,14 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm font-black text-rose-600 tabular-nums">R$ {dailyMetrics.avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                  </div>
                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Produtos por venda</p>
-                    <p className="text-sm font-black text-slate-800 dark:text-white tabular-nums">{dailyMetrics.prodsPerSale.toFixed(3)}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Ipv Médio</p>
+                    <p className="text-sm font-black text-slate-800 dark:text-white tabular-nums">{dailyMetrics.prodsPerSale.toFixed(2)}</p>
                  </div>
               </div>
 
               <div className="pt-6 mt-auto border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                 <p className="text-[9px] font-bold text-slate-400 uppercase">Info: {lastUpdate.toLocaleTimeString()}</p>
-                 <span className="text-[8px] font-black text-emerald-500 uppercase animate-pulse">● Live Sync</span>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase">Sinc: {lastUpdate.toLocaleTimeString()}</p>
+                 <span className="text-[8px] font-black text-emerald-500 uppercase animate-pulse">● Live Data</span>
               </div>
            </div>
         </div>
@@ -194,10 +199,9 @@ const Dashboard: React.FC = () => {
         {/* VENDAS POR HORA */}
         <div className="lg:col-span-9 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vendas por hora</h4>
+              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fluxo de Vendas (Hora em Hora)</h4>
               <div className="flex gap-2">
-                 <span className="material-symbols-outlined text-slate-300 text-lg cursor-pointer">ios_share</span>
-                 <span className="material-symbols-outlined text-slate-300 text-lg cursor-pointer">fullscreen</span>
+                 <span className="material-symbols-outlined text-slate-300 text-lg">timeline</span>
               </div>
            </div>
            <div className="p-6 h-[280px]">
@@ -212,7 +216,7 @@ const Dashboard: React.FC = () => {
                   />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#e11d48">
                     {hourlyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#e11d48' : '#f1f5f9'} />
+                      <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#136dec' : '#f1f5f9'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -227,33 +231,23 @@ const Dashboard: React.FC = () => {
         {/* PRODUTOS VENDIDOS */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
-              <h4 className="text-[10px] font-black uppercase text-slate-500">Produtos vendidos</h4>
-              <div className="flex gap-2 text-slate-300"><span className="material-symbols-outlined text-sm">ios_share</span><span className="material-symbols-outlined text-sm">grid_view</span></div>
+              <h4 className="text-[10px] font-black uppercase text-slate-500">Ranking de Itens Vendidos</h4>
            </div>
            <div className="overflow-auto flex-1 custom-scrollbar">
               <table className="w-full text-left">
                  <thead className="sticky top-0 bg-white dark:bg-slate-900 z-10 border-b">
                     <tr className="text-[9px] font-black uppercase text-slate-400">
-                       <th className="px-4 py-4">Código</th>
-                       <th className="px-4 py-4">Produto</th>
-                       <th className="px-4 py-4">UN</th>
-                       <th className="px-4 py-4 text-center">Estoque</th>
-                       <th className="px-4 py-4 text-center">Vend.</th>
-                       <th className="px-4 py-4 text-right">Total</th>
+                       <th className="px-4 py-4">SKU</th>
+                       <th className="px-4 py-4">Descrição</th>
+                       <th className="px-4 py-4 text-center">Saídas</th>
+                       <th className="px-4 py-4 text-right">Total Bruto</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                     {soldProductsList.map((item, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 text-[10px]">
-                         <td className="px-4 py-4 font-mono text-slate-400">{item.code}</td>
+                         <td className="px-4 py-4 font-mono text-primary font-bold">{item.code}</td>
                          <td className="px-4 py-4 font-black uppercase text-slate-700 dark:text-slate-200 truncate max-w-[150px]">{item.name}</td>
-                         <td className="px-4 py-4 font-bold text-slate-400">UN</td>
-                         <td className="px-4 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                               {item.stock <= 0 && <span className="material-symbols-outlined text-rose-500 text-[12px]">warning</span>}
-                               <span className={`font-black tabular-nums ${item.stock <= 0 ? 'text-rose-500' : 'text-slate-500'}`}>{item.stock}</span>
-                            </div>
-                         </td>
                          <td className="px-4 py-4 text-center font-black text-slate-700 dark:text-slate-300 tabular-nums">{item.qty}</td>
                          <td className="px-4 py-4 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {item.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                       </tr>
@@ -263,23 +257,20 @@ const Dashboard: React.FC = () => {
            </div>
         </div>
 
-        {/* DESEMPENHO DE VENDEDORES (Atualizado com colunas solicitadas) */}
+        {/* DESEMPENHO DE VENDEDORES */}
         <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] flex flex-col">
            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
-              <h4 className="text-[10px] font-black uppercase text-slate-500">Desempenho de vendedores</h4>
-              <div className="flex gap-2 text-slate-300"><span className="material-symbols-outlined text-sm">ios_share</span><span className="material-symbols-outlined text-sm">grid_view</span></div>
+              <h4 className="text-[10px] font-black uppercase text-slate-500">Performance da Equipe</h4>
            </div>
            <div className="overflow-auto flex-1 custom-scrollbar">
               <table className="w-full text-left">
                  <thead className="sticky top-0 bg-white dark:bg-slate-900 z-10 border-b">
                     <tr className="text-[8px] font-black uppercase text-slate-400">
                        <th className="px-3 py-4">Vendedor</th>
-                       <th className="px-2 py-4 text-center">Status</th>
+                       <th className="px-2 py-4 text-center">Clima</th>
                        <th className="px-2 py-4 text-center">Vendas</th>
-                       <th className="px-2 py-4 text-center">Itens</th>
-                       <th className="px-2 py-4 text-center">Ipv</th>
                        <th className="px-3 py-4 text-right">Total</th>
-                       <th className="px-3 py-4 text-right">T. Médio</th>
+                       <th className="px-3 py-4 text-right">Ticket</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -288,8 +279,6 @@ const Dashboard: React.FC = () => {
                          <td className="px-3 py-4 font-black uppercase text-slate-600 dark:text-slate-300 truncate max-w-[70px]">{v.name}</td>
                          <td className="px-2 py-4 text-center text-lg">{v.reaction.emoji}</td>
                          <td className="px-2 py-4 text-center text-slate-500 font-bold tabular-nums">{v.qtySales}</td>
-                         <td className="px-2 py-4 text-center text-primary font-black tabular-nums">{v.qtyProds}</td>
-                         <td className="px-2 py-4 text-center text-slate-700 dark:text-slate-200 font-black tabular-nums bg-slate-50/50 dark:bg-slate-800/50">{v.prodAvg.toFixed(2)}</td>
                          <td className="px-3 py-4 text-right font-black text-slate-700 dark:text-slate-200 tabular-nums">R$ {v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                          <td className="px-3 py-4 text-right font-black text-rose-600 tabular-nums">R$ {v.ticket.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                       </tr>

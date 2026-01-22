@@ -38,7 +38,7 @@ const Login: React.FC = () => {
       const res = await fetch('/api/init-db');
       const data = await res.json();
       if (res.ok) {
-        alert("Sistema inicializado com sucesso! Use 'Administrador Sistema' / '123456'");
+        alert(`Sistema inicializado com sucesso! Use 'Administrador Sistema' / '123456'`);
         await refreshData();
       } else {
         alert("Erro ao configurar: " + data.error);
@@ -85,7 +85,7 @@ const Login: React.FC = () => {
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl p-10 rounded-[3rem] shadow-2xl border border-white/20 dark:border-slate-800">
           <div className="flex flex-col items-center mb-10">
             {systemConfig.logoUrl ? (
-              <img src={systemConfig.logoUrl} className="h-16 mb-4 object-contain" alt="Logo" />
+              <img src={systemConfig.logoUrl} className="h-20 mb-4 object-contain" alt="Logo" />
             ) : (
               <div className="bg-primary size-16 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary/20 mb-4">
                 <span className="material-symbols-outlined text-4xl">storefront</span>
@@ -157,10 +157,10 @@ const Login: React.FC = () => {
               disabled={setupLoading}
               className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase flex items-center gap-2"
              >
-               {setupLoading ? 'Configurando...' : 'Configurar Sistema (Primeiro Acesso)'}
+               {setupLoading ? 'Configurando...' : 'Sincronizar Estrutura'}
                <span className="material-symbols-outlined text-sm">settings</span>
              </button>
-             <p className="text-[9px] text-slate-300 font-bold uppercase tracking-[0.2em]">Retail Cloud v4.5.1</p>
+             <p className="text-[9px] text-slate-300 font-bold uppercase tracking-[0.2em]">Tem Acessorio v4.5.1</p>
           </div>
         </div>
       </div>

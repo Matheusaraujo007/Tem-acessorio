@@ -49,10 +49,6 @@ const PDV: React.FC = () => {
   const [customerForm, setCustomerForm] = useState(initialCustomerForm);
   const [customerModalTab, setCustomerModalTab] = useState<'basic' | 'address'>('basic');
 
-  // Form de nova senha
-  const [newPass, setNewPass] = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-
   const searchInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -76,7 +72,13 @@ const PDV: React.FC = () => {
     });
   }, [search, category, products]);
 
-  const vendors = useMemo(() => users.filter(u => u.role === UserRole.VENDOR || u.role === UserRole.ADMIN), [users]);
+  // FILTRO DE VENDEDORES POR UNIDADE
+  const vendors = useMemo(() => {
+    return users.filter(u => 
+      (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN) && 
+      u.storeId === currentUser?.storeId
+    );
+  }, [users, currentUser]);
 
   // Fecha menu ao clicar fora
   useEffect(() => {
@@ -114,7 +116,6 @@ const PDV: React.FC = () => {
       const vendor = vendors.find(v => v.id === selectedVendorId);
       const customer = customers.find(c => c.id === selectedCustomerId);
       
-      // Salva dados para o recibo antes de limpar
       setLastSaleData({
         id: saleId,
         items: [...cart],
@@ -127,10 +128,8 @@ const PDV: React.FC = () => {
         customer: customer?.name || 'Consumidor Final'
       });
 
-      // Processa no banco Neon
       await processSale(cart, totalGeral, paymentMethod, selectedCustomerId, selectedVendorId, shippingValue);
       
-      // Limpa PDV
       setCart([]);
       setShippingValue(0);
       setSuccessType('SALE');
@@ -178,7 +177,6 @@ const PDV: React.FC = () => {
     }
   };
 
-  // Lógica de Devolução
   useEffect(() => {
     if (selectedReturnCustomer) {
       const sales = transactions.filter(t => t.clientId === selectedReturnCustomer.id && t.type === 'INCOME' && t.category === 'Venda');
@@ -292,7 +290,7 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display">
       
-      {/* COMPONENTE DE IMPRESSÃO (ESCONDIDO NA TELA) */}
+      {/* COMPONENTE DE IMPRESSÃO */}
       <div id="receipt-print" className="hidden print:block p-4 text-slate-900 bg-white w-[80mm] font-mono text-[10px]">
          <div className="text-center mb-4">
             <h2 className="text-sm font-bold uppercase">{currentStore.name}</h2>
@@ -324,7 +322,7 @@ const PDV: React.FC = () => {
             <p className="mt-2 uppercase">PAGAMENTO: {lastSaleData?.payment}</p>
             <div className="border-b border-dashed border-slate-300 my-2"></div>
             <p className="text-center mt-4">OBRIGADO PELA PREFERÊNCIA!</p>
-            <p className="text-center text-[8px] opacity-50">Retail Cloud ERP - Recibo não fiscal</p>
+            <p className="text-center text-[8px] opacity-50">Tem Acessorio ERP - Recibo não fiscal</p>
          </div>
       </div>
 
@@ -457,7 +455,7 @@ const PDV: React.FC = () => {
         </aside>
       </main>
 
-      {/* MODAL CHECKOUT (Onde a venda é finalizada) */}
+      {/* MODAL CHECKOUT */}
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -481,7 +479,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL SUCESSO (Venda, OS, Devolução) */}
+      {/* MODAL SUCESSO */}
       {showSuccessModal && (
         <div className={`fixed inset-0 z-[500] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : successType === 'RETURN' ? 'bg-amber-600' : successType === 'CANCEL' ? 'bg-rose-500' : 'bg-emerald-500'}`}>
            <div className="text-center text-white space-y-8 animate-in zoom-in-50 duration-500 print:hidden">
