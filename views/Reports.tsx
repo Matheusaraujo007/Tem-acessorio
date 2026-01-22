@@ -18,22 +18,40 @@ const Reports: React.FC = () => {
 
   const [startDate, setStartDate] = useState(thirtyDaysAgoStr);
   const [endDate, setEndDate] = useState(todayStr);
+  
+  // Novos Estados de Filtro
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('Todas');
+  const [filterPayment, setFilterPayment] = useState('Todos');
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
   const currentStoreName = currentStore?.name || '';
 
-  // Filtro base de transações
+  const categories = useMemo(() => {
+    return ['Todas', ...Array.from(new Set(products.map(p => p.category)))];
+  }, [products]);
+
+  // Filtro base de transações (Data e Unidade)
   const periodSales = useMemo(() => {
     return (transactions || []).filter(t => {
       const belongsToStore = isAdmin || t.store === currentStoreName;
       const isCorrectType = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
       const inRange = t.date >= startDate && t.date <= endDate;
-      return belongsToStore && isCorrectType && inRange;
-    });
-  }, [transactions, startDate, endDate, isAdmin, currentStoreName]);
+      
+      // Aplicar filtro de pagamento se selecionado
+      const matchesPayment = filterPayment === 'Todos' || t.method === filterPayment;
+      
+      // Aplicar busca textual (para relatório analítico)
+      const matchesSearch = searchTerm === '' || 
+        (t.client?.toLowerCase().includes(searchTerm.toLowerCase())) || 
+        (t.id.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // --- LÓGICAS DE AGRUPAMENTO ---
+      return belongsToStore && isCorrectType && inRange && matchesPayment && matchesSearch;
+    });
+  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterPayment, searchTerm]);
+
+  // --- LÓGICAS DE AGRUPAMENTO COM FILTROS ADICIONAIS ---
 
   const dailyData = useMemo(() => {
     const map: Record<string, { label: string, total: number, count: number }> = {};
@@ -72,13 +90,17 @@ const Reports: React.FC = () => {
     periodSales.forEach(s => {
       const cid = s.clientId || 'avulso';
       const cname = s.client || 'Consumidor Final';
+      
+      // Filtro de Busca por Cliente
+      if (searchTerm !== '' && !cname.toLowerCase().includes(searchTerm.toLowerCase())) return;
+
       if (!map[cid]) map[cid] = { name: cname, total: 0, count: 0, lastSale: s.date };
       map[cid].total += s.value;
       map[cid].count += 1;
       if (s.date > map[cid].lastSale) map[cid].lastSale = s.date;
     });
     return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [periodSales]);
+  }, [periodSales, searchTerm]);
 
   const vendorStats = useMemo(() => {
     const map: Record<string, { name: string, total: number, count: number, items: number }> = {};
@@ -96,12 +118,20 @@ const Reports: React.FC = () => {
   }, [periodSales, users]);
 
   const productsStats = useMemo(() => {
-    const map: Record<string, { name: string, sku: string, qty: number, total: number, cost: number }> = {};
+    const map: Record<string, { name: string, sku: string, qty: number, total: number, cost: number, category: string }> = {};
     periodSales.forEach(s => {
       if (s.items && Array.isArray(s.items)) {
         s.items.forEach(i => {
+          // Aplicar Filtros de Produto (Categoria e Nome/SKU)
+          const matchesCategory = filterCategory === 'Todas' || i.category === filterCategory;
+          const matchesSearch = searchTerm === '' || 
+            i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            (i.sku && i.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+
+          if (!matchesCategory || !matchesSearch) return;
+
           const key = i.sku || i.name || i.id;
-          if (!map[key]) map[key] = { name: i.name, sku: i.sku || 'N/A', qty: 0, total: 0, cost: 0 };
+          if (!map[key]) map[key] = { name: i.name, sku: i.sku || 'N/A', qty: 0, total: 0, cost: 0, category: i.category };
           map[key].qty += i.quantity;
           map[key].total += (i.quantity * i.salePrice);
           map[key].cost += (i.quantity * (i.costPrice || 0));
@@ -109,17 +139,17 @@ const Reports: React.FC = () => {
       }
     });
     return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [periodSales]);
+  }, [periodSales, filterCategory, searchTerm]);
 
   const futureDeliveries = useMemo(() => {
     return (serviceOrders || []).filter(os => {
       const belongsToStore = isAdmin || os.store === currentStoreName;
-      // Consideramos "Entrega Futura" qualquer OS que não esteja cancelada ou concluída
       const isPending = os.status !== ServiceOrderStatus.FINISHED && os.status !== ServiceOrderStatus.CANCELLED;
       const inRange = os.date >= startDate && os.date <= endDate;
-      return belongsToStore && isPending && inRange;
+      const matchesSearch = searchTerm === '' || os.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || os.id.toLowerCase().includes(searchTerm.toLowerCase());
+      return belongsToStore && isPending && inRange && matchesSearch;
     });
-  }, [serviceOrders, isAdmin, currentStoreName, startDate, endDate]);
+  }, [serviceOrders, isAdmin, currentStoreName, startDate, endDate, searchTerm]);
 
   const unitSalesStats = useMemo(() => {
     const unitMap: Record<string, { storeName: string; total: number; count: number; vendors: Record<string, { name: string; total: number; count: number }> }> = {};
@@ -137,7 +167,7 @@ const Reports: React.FC = () => {
     return Object.values(unitMap).sort((a, b) => b.total - a.total);
   }, [periodSales, users]);
 
-  // KPI Globais
+  // KPI Dinâmicos baseados nos filtros
   const totalRevenue = periodSales.reduce((acc, t) => acc + t.value, 0);
   const globalAvgTicket = periodSales.length > 0 ? totalRevenue / periodSales.length : 0;
 
@@ -177,7 +207,7 @@ const Reports: React.FC = () => {
             background: white !important;
             color: black !important;
           }
-          .no-print, aside, header, nav, button, input[type="date"] { display: none !important; }
+          .no-print, aside, header, nav, button, input[type="date"], .filter-bar { display: none !important; }
           .rounded-[3rem], .rounded-[2rem], .rounded-3xl { border-radius: 0 !important; }
           .shadow-sm, .shadow-xl, .shadow-2xl, .shadow-lg { box-shadow: none !important; border: 1px solid #eee !important; }
           table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; }
@@ -217,12 +247,58 @@ const Reports: React.FC = () => {
           </div>
         </div>
 
+        {/* BARRA DE FILTROS DINÂMICA (Apenas nos relatórios solicitados) */}
+        {(['por_vendas', 'por_cliente', 'por_produto', 'margem_bruta', 'entrega_futura'].includes(reportType)) && (
+          <div className="filter-bar no-print bg-white dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center animate-in slide-in-from-top-4">
+            <div className="flex-1 min-w-[250px] relative">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+              <input 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                placeholder={reportType === 'por_cliente' ? "Buscar por nome do cliente..." : "Buscar por nome ou SKU..."}
+                className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-12 pr-4 text-[10px] font-black uppercase focus:ring-2 focus:ring-primary/20" 
+              />
+            </div>
+
+            {(reportType === 'por_produto' || reportType === 'margem_bruta') && (
+              <select 
+                value={filterCategory} 
+                onChange={e => setFilterCategory(e.target.value)}
+                className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-[10px] font-black uppercase tracking-widest"
+              >
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+
+            {reportType === 'por_vendas' && (
+              <select 
+                value={filterPayment} 
+                onChange={e => setFilterPayment(e.target.value)}
+                className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-[10px] font-black uppercase tracking-widest"
+              >
+                <option value="Todos">Todas as Formas</option>
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Pix">Pix</option>
+                <option value="Debito">Cartão de Débito</option>
+                <option value="Credito">Cartão de Crédito</option>
+              </select>
+            )}
+
+            <button 
+              onClick={() => { setSearchTerm(''); setFilterCategory('Todas'); setFilterPayment('Todos'); }} 
+              className="h-12 px-6 text-[9px] font-black uppercase text-slate-400 hover:text-primary transition-all"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        )}
+
         {/* KPI GRID */}
         <div className="kpi-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <ReportKPICard title="Ticket Médio" value={`R$ ${globalAvgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="payments" color="text-primary" />
           <ReportKPICard title="Faturamento Bruto" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="trending_up" color="text-emerald-500" />
           <ReportKPICard title="Operações" value={periodSales.length.toString()} icon="shopping_bag" color="text-amber-500" />
-          <ReportKPICard title="Clientes" value={customerRanking.length.toString()} icon="groups" color="text-blue-500" />
+          <ReportKPICard title="Itens Únicos" value={(reportType === 'por_produto' || reportType === 'margem_bruta' ? productsStats.length : customerRanking.length).toString()} icon="layers" color="text-blue-500" />
         </div>
 
         {/* TABELA DE DADOS DINÂMICA */}
@@ -361,7 +437,7 @@ const Reports: React.FC = () => {
                     <tr key={i} className="font-bold hover:bg-slate-50 transition-all">
                       <td className="px-8 py-5 uppercase">
                          <p>{p.name}</p>
-                         <p className="text-[9px] text-slate-400 font-mono tracking-tighter">SKU: {p.sku}</p>
+                         <p className="text-[9px] text-slate-400 font-mono tracking-tighter">SKU: {p.sku} • {p.category}</p>
                       </td>
                       <td className="px-8 py-5 text-center tabular-nums">{p.qty}</td>
                       <td className="px-8 py-5 text-right font-black tabular-nums">R$ {p.total.toLocaleString('pt-BR')}</td>
@@ -431,10 +507,16 @@ const Reports: React.FC = () => {
               </table>
            )}
 
-           {(periodSales.length === 0 && reportType !== 'entrega_futura') && (
+           {(periodSales.length === 0 && (reportType === 'por_vendas' || reportType === 'evolucao')) && (
               <div className="py-32 text-center no-print">
                  <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">query_stats</span>
                  <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhum dado localizado para os filtros atuais</p>
+              </div>
+           )}
+           {(reportType === 'por_produto' || reportType === 'margem_bruta') && productsStats.length === 0 && (
+              <div className="py-32 text-center no-print">
+                 <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">inventory_2</span>
+                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhum produto encontrado com estes filtros</p>
               </div>
            )}
            {reportType === 'entrega_futura' && futureDeliveries.length === 0 && (
