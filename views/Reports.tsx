@@ -33,9 +33,8 @@ const Reports: React.FC = () => {
     });
   }, [transactions, startDate, endDate, isAdmin, currentStoreName]);
 
-  // --- LÓGICAS ESPECÍFICAS PARA CADA RELATÓRIO ---
+  // --- LÓGICAS DE DADOS ---
 
-  // 1. Evolução Diária / Ticket Período
   const dailyData = useMemo(() => {
     const map: Record<string, { label: string, total: number, count: number }> = {};
     periodSales.forEach(s => {
@@ -46,7 +45,6 @@ const Reports: React.FC = () => {
     return Object.values(map).sort((a, b) => b.label.localeCompare(a.label));
   }, [periodSales]);
 
-  // 2. Vendas por Ano
   const yearlyData = useMemo(() => {
     const map: Record<string, { label: string, total: number, count: number }> = {};
     periodSales.forEach(s => {
@@ -58,11 +56,10 @@ const Reports: React.FC = () => {
     return Object.values(map).sort((a, b) => b.label.localeCompare(a.label));
   }, [periodSales]);
 
-  // 3. Ticket Médio por Mês/Ano
   const monthlyData = useMemo(() => {
     const map: Record<string, { label: string, total: number, count: number }> = {};
     periodSales.forEach(s => {
-      const monthYear = s.date.substring(0, 7); // YYYY-MM
+      const monthYear = s.date.substring(0, 7);
       if (!map[monthYear]) map[monthYear] = { label: monthYear, total: 0, count: 0 };
       map[monthYear].total += s.value;
       map[monthYear].count += 1;
@@ -70,7 +67,6 @@ const Reports: React.FC = () => {
     return Object.values(map).sort((a, b) => b.label.localeCompare(a.label));
   }, [periodSales]);
 
-  // 4. Vendas por Cliente
   const customerRanking = useMemo(() => {
     const map: Record<string, { name: string, total: number, count: number, lastSale: string }> = {};
     periodSales.forEach(s => {
@@ -84,7 +80,6 @@ const Reports: React.FC = () => {
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [periodSales]);
 
-  // 5. Desempenho Vendedor / Ticket Vendedor
   const vendorStats = useMemo(() => {
     const map: Record<string, { name: string, total: number, count: number, items: number }> = {};
     periodSales.forEach(s => {
@@ -98,7 +93,6 @@ const Reports: React.FC = () => {
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [periodSales, users]);
 
-  // 6. Produtos / Margem Bruta
   const productsStats = useMemo(() => {
     const map: Record<string, { name: string, sku: string, qty: number, total: number, cost: number }> = {};
     periodSales.forEach(s => {
@@ -112,7 +106,6 @@ const Reports: React.FC = () => {
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [periodSales]);
 
-  // 7. Entrega Futura (Baseado em OS não concluídas)
   const futureDeliveries = useMemo(() => {
     return (serviceOrders || []).filter(os => {
       const belongsToStore = isAdmin || os.store === currentStoreName;
@@ -121,7 +114,6 @@ const Reports: React.FC = () => {
     });
   }, [serviceOrders, isAdmin, currentStoreName]);
 
-  // 8. Vendas por Unidade (Hierárquico)
   const unitSalesStats = useMemo(() => {
     const unitMap: Record<string, { storeName: string; total: number; count: number; vendors: Record<string, { name: string; total: number; count: number }> }> = {};
     periodSales.forEach(s => {
@@ -165,25 +157,16 @@ const Reports: React.FC = () => {
       <style>{`
         @media print {
           @page { margin: 1cm; size: A4; }
-          aside, header, nav, .no-print { display: none !important; }
-          main, body, #root, .flex-1 { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            display: block !important; 
-            width: 100% !important; 
-            background: white !important; 
-            color: black !important; 
-          }
+          aside, header, nav, .no-print, .shadow-sm, .shadow-xl { display: none !important; }
+          main, body, #root, .flex-1 { margin: 0 !important; padding: 0 !important; display: block !important; width: 100% !important; background: white !important; color: black !important; }
           #report-print-container { position: relative; width: 100%; }
-          .shadow-sm, .shadow-xl, .shadow-2xl, .shadow-lg { box-shadow: none !important; border: 1px solid #eee !important; }
           .rounded-[3rem], .rounded-[2rem], .rounded-3xl { border-radius: 0 !important; }
-          .bg-slate-50, .bg-slate-100 { background-color: #f8fafc !important; print-color-adjust: exact; }
+          table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #eee !important; }
+          th { background-color: #f8fafc !important; color: #475569 !important; padding: 12px 10px !important; font-size: 9pt !important; border-bottom: 2px solid #e2e8f0 !important; }
+          td { padding: 10px !important; font-size: 9pt !important; border-bottom: 1px solid #f1f5f9 !important; }
           .text-primary { color: #136dec !important; }
-          table { width: 100% !important; border-collapse: collapse !important; margin-top: 10px; }
-          th, td { border-bottom: 1px solid #eee !important; padding: 12px 8px !important; font-size: 10pt !important; }
-          th { background-color: #f1f5f9 !important; font-weight: bold !important; text-transform: uppercase; }
+          .kpi-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; border-bottom: 1px solid #eee !important; padding-bottom: 20px !important; }
           tr { page-break-inside: avoid !important; }
-          .kpi-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; }
         }
       `}</style>
 
@@ -195,7 +178,7 @@ const Reports: React.FC = () => {
             <div className="mt-4 flex flex-wrap gap-4 text-[10px] font-black uppercase text-slate-400 tracking-[0.1em]">
               <span>Período: {startDate} até {endDate}</span>
               <span className="hidden md:inline">•</span>
-              <span>Filtro: {isAdmin ? 'ADMINISTRATIVO GLOBAL' : currentStoreName}</span>
+              <span>Unidade: {isAdmin ? 'ADMINISTRATIVO GLOBAL' : currentStoreName}</span>
             </div>
           </div>
           
@@ -204,7 +187,7 @@ const Reports: React.FC = () => {
                 <span className="material-symbols-outlined text-slate-400 text-sm">calendar_month</span>
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black uppercase focus:ring-0 p-1" />
              </div>
-             <div className="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+             <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
              <div className="flex items-center gap-2 px-3">
                 <span className="material-symbols-outlined text-slate-400 text-sm">event</span>
                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black uppercase focus:ring-0 p-1" />
@@ -220,11 +203,11 @@ const Reports: React.FC = () => {
           <ReportKPICard title="Ticket Médio" value={`R$ ${globalAvgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="payments" color="text-primary" />
           <ReportKPICard title="Faturamento Bruto" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon="trending_up" color="text-emerald-500" />
           <ReportKPICard title="Operações" value={periodSales.length.toString()} icon="shopping_bag" color="text-amber-500" />
-          <ReportKPICard title="Clientes Diferentes" value={customerRanking.length.toString()} icon="groups" color="text-blue-500" />
+          <ReportKPICard title="Clientes" value={customerRanking.length.toString()} icon="groups" color="text-blue-500" />
         </div>
 
-        {/* TABELA DE DADOS DINÂMICA */}
-        <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        {/* TABELA DE DADOS */}
+        <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden min-h-[400px]">
            
            {/* RELATÓRIO: VENDAS POR UNIDADE */}
            {reportType === 'vendas_unidade' && (
@@ -234,23 +217,28 @@ const Reports: React.FC = () => {
                     <div className="bg-slate-50 dark:bg-slate-800/40 p-6 flex justify-between items-center border-b">
                       <div>
                         <h4 className="text-lg font-black uppercase">{unit.storeName}</h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase">{unit.count} Vendas</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{unit.count} Operações</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-black text-primary">R$ {unit.total.toLocaleString('pt-BR')}</p>
+                        <p className="text-2xl font-black text-primary tabular-nums">R$ {unit.total.toLocaleString('pt-BR')}</p>
                       </div>
                     </div>
                     <table className="w-full text-left">
                       <thead>
-                        <tr><th>Vendedor</th><th className="text-center">Vendas</th><th className="text-right">Total (R$)</th><th className="text-right">Part %</th></tr>
+                        <tr className="bg-white dark:bg-slate-900 border-b">
+                           <th className="px-8 py-4 font-black uppercase text-[10px] text-slate-400">Vendedor</th>
+                           <th className="px-8 py-4 font-black uppercase text-[10px] text-slate-400 text-center">Vendas</th>
+                           <th className="px-8 py-4 font-black uppercase text-[10px] text-slate-400 text-right">Total (R$)</th>
+                           <th className="px-8 py-4 font-black uppercase text-[10px] text-slate-400 text-right">Part %</th>
+                        </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                         {(Object.values(unit.vendors) as any[]).sort((a,b) => b.total - a.total).map((v, idx) => (
-                          <tr key={idx} className="font-bold">
-                            <td className="uppercase">{v.name}</td>
-                            <td className="text-center">{v.count}</td>
-                            <td className="text-right font-black">R$ {v.total.toLocaleString('pt-BR')}</td>
-                            <td className="text-right text-primary">{((v.total / unit.total) * 100).toFixed(1)}%</td>
+                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 font-bold transition-all">
+                            <td className="px-8 py-4 uppercase text-sm">{v.name}</td>
+                            <td className="px-8 py-4 text-center tabular-nums">{v.count}</td>
+                            <td className="px-8 py-4 text-right font-black tabular-nums">R$ {v.total.toLocaleString('pt-BR')}</td>
+                            <td className="px-8 py-4 text-right text-primary tabular-nums">{((v.total / unit.total) * 100).toFixed(1)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -262,22 +250,22 @@ const Reports: React.FC = () => {
 
            {/* RELATÓRIO: EVOLUÇÃO DIÁRIA / POR ANO / TICKET PERIODO */}
            {(reportType === 'evolucao' || reportType === 'por_ano' || reportType === 'ticket_periodo') && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>{reportType === 'por_ano' ? 'Ano' : reportType === 'ticket_periodo' ? 'Mês/Ano' : 'Data'}</th>
-                    <th className="text-center">Vendas</th>
-                    <th className="text-right">Faturamento Bruto</th>
-                    <th className="text-right">Ticket Médio</th>
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-800/50">
+                  <tr className="border-b border-slate-100 dark:border-slate-800">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">{reportType === 'por_ano' ? 'Ano' : reportType === 'ticket_periodo' ? 'Mês/Ano' : 'Data'}</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Vendas</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Faturamento Bruto</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Ticket Médio</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {(reportType === 'por_ano' ? yearlyData : reportType === 'ticket_periodo' ? monthlyData : dailyData).map((d, i) => (
-                    <tr key={i} className="font-bold">
-                      <td className="uppercase">{d.label}</td>
-                      <td className="text-center">{d.count}</td>
-                      <td className="text-right font-black">R$ {d.total.toLocaleString('pt-BR')}</td>
-                      <td className="text-right text-primary">R$ {(d.total / d.count).toLocaleString('pt-BR')}</td>
+                    <tr key={i} className="font-bold hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-8 py-5 uppercase text-sm">{d.label}</td>
+                      <td className="px-8 py-5 text-center tabular-nums">{d.count}</td>
+                      <td className="px-8 py-5 text-right font-black tabular-nums">R$ {d.total.toLocaleString('pt-BR')}</td>
+                      <td className="px-8 py-5 text-right text-primary font-black tabular-nums">R$ {(d.total / d.count).toLocaleString('pt-BR')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -286,17 +274,22 @@ const Reports: React.FC = () => {
 
            {/* RELATÓRIO: POR CLIENTE */}
            {reportType === 'por_cliente' && (
-              <table>
+              <table className="w-full text-left">
                 <thead>
-                  <tr><th>Cliente</th><th className="text-center">Freq.</th><th className="text-right">Última Compra</th><th className="text-right">Total Acumulado</th></tr>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Cliente</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-center">Freq.</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-right">Última Compra</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-right">Total Acumulado</th>
+                  </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {customerRanking.map((c, i) => (
-                    <tr key={i} className="font-bold">
-                      <td className="uppercase">{c.name}</td>
-                      <td className="text-center">{c.count}x</td>
-                      <td className="text-right text-slate-400">{c.lastSale}</td>
-                      <td className="text-right text-primary font-black">R$ {c.total.toLocaleString('pt-BR')}</td>
+                    <tr key={i} className="font-bold hover:bg-slate-50 transition-all">
+                      <td className="px-8 py-5 uppercase">{c.name}</td>
+                      <td className="px-8 py-5 text-center tabular-nums">{c.count}x</td>
+                      <td className="px-8 py-5 text-right text-slate-400 tabular-nums">{c.lastSale}</td>
+                      <td className="px-8 py-5 text-right text-primary font-black tabular-nums">R$ {c.total.toLocaleString('pt-BR')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -305,118 +298,32 @@ const Reports: React.FC = () => {
 
            {/* RELATÓRIO: POR VENDEDOR / TICKET VENDEDOR */}
            {(reportType === 'por_vendedor' || reportType === 'ticket_vendedor') && (
-              <table>
+              <table className="w-full text-left">
                 <thead>
-                  <tr><th>Vendedor</th><th className="text-center">Vendas</th><th className="text-center">Itens (IPV)</th><th className="text-right">Ticket Médio</th><th className="text-right">Total Bruto</th></tr>
-                </thead>
-                <tbody>
-                  {vendorStats.map((v, i) => (
-                    <tr key={i} className="font-bold">
-                      <td className="uppercase">{v.name}</td>
-                      <td className="text-center">{v.count}</td>
-                      <td className="text-center">{(v.items / v.count).toFixed(2)}</td>
-                      <td className="text-right text-amber-500 font-black">R$ {(v.total / v.count).toLocaleString('pt-BR')}</td>
-                      <td className="text-right text-primary font-black">R$ {v.total.toLocaleString('pt-BR')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           )}
-
-           {/* RELATÓRIO: POR PRODUTO / MARGEM BRUTA */}
-           {(reportType === 'por_produto' || reportType === 'margem_bruta') && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Produto / SKU</th>
-                    <th className="text-center">Qtd.</th>
-                    <th className="text-right">Total Venda</th>
-                    {reportType === 'margem_bruta' && <th className="text-right">Lucro Bruto (Est.)</th>}
-                    {reportType === 'margem_bruta' && <th className="text-right">Margem %</th>}
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Vendedor</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-center">Vendas</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-right">Ticket Médio</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-right">Total Bruto</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {productsStats.map((p, i) => (
-                    <tr key={i} className="font-bold">
-                      <td className="uppercase">
-                        <p>{p.name}</p>
-                        <p className="text-[8px] text-slate-400 font-mono">{p.sku}</p>
-                      </td>
-                      <td className="text-center">{p.qty}</td>
-                      <td className="text-right">R$ {p.total.toLocaleString('pt-BR')}</td>
-                      {reportType === 'margem_bruta' && <td className="text-right text-emerald-500 font-black">R$ {(p.total - p.cost).toLocaleString('pt-BR')}</td>}
-                      {reportType === 'margem_bruta' && <td className="text-right text-primary font-black">{p.total > 0 ? (((p.total - p.cost) / p.total) * 100).toFixed(1) : 0}%</td>}
+                <tbody className="divide-y divide-slate-50">
+                  {vendorStats.map((v, i) => (
+                    <tr key={i} className="font-bold hover:bg-slate-50 transition-all">
+                      <td className="px-8 py-5 uppercase">{v.name}</td>
+                      <td className="px-8 py-5 text-center tabular-nums">{v.count}</td>
+                      <td className="px-8 py-5 text-right text-amber-500 tabular-nums font-black">R$ {(v.total / v.count).toLocaleString('pt-BR')}</td>
+                      <td className="px-8 py-5 text-right text-primary font-black tabular-nums">R$ {v.total.toLocaleString('pt-BR')}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
            )}
 
-           {/* RELATÓRIO: POR VENDAS ANALÍTICO */}
-           {reportType === 'por_vendas' && (
-              <table>
-                <thead>
-                  <tr><th>ID Venda</th><th>Data</th><th>Cliente</th><th>Pagamento</th><th className="text-right">Valor Total</th></tr>
-                </thead>
-                <tbody>
-                  {periodSales.map((s, i) => (
-                    <tr key={i} className="text-[11px]">
-                      <td className="font-mono text-primary font-black">{s.id}</td>
-                      <td className="text-slate-500">{s.date}</td>
-                      <td className="uppercase font-bold">{s.client || 'Consumidor'}</td>
-                      <td className="uppercase font-bold">{s.method}</td>
-                      <td className="text-right font-black">R$ {s.value.toLocaleString('pt-BR')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           )}
-
-           {/* RELATÓRIO: ENTREGA FUTURA */}
-           {reportType === 'entrega_futura' && (
-              <table>
-                <thead>
-                  <tr><th>ID OS</th><th>Abertura</th><th>Cliente</th><th>Status</th><th className="text-right">Valor Estimado</th></tr>
-                </thead>
-                <tbody>
-                  {futureDeliveries.map((os, i) => (
-                    <tr key={i} className="font-bold">
-                      <td className="font-mono text-primary font-black">{os.id}</td>
-                      <td className="text-slate-400">{os.date}</td>
-                      <td className="uppercase">{os.customerName}</td>
-                      <td><span className="bg-amber-100 text-amber-600 px-2 py-0.5 rounded text-[9px]">{os.status}</span></td>
-                      <td className="text-right text-primary font-black">R$ {os.totalValue.toLocaleString('pt-BR')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           )}
-
-           {/* RELATÓRIO: POR SERVIÇO */}
-           {reportType === 'por_servico' && (
-              <table>
-                <thead>
-                  <tr><th>Mão de Obra</th><th className="text-center">Execuções</th><th className="text-right">Total Faturado</th></tr>
-                </thead>
-                <tbody>
-                  {productsStats.filter(p => {
-                    const original = products.find(x => x.id === p.sku || x.name === p.name);
-                    return original?.isService || p.sku.startsWith('SRV');
-                  }).map((p, i) => (
-                    <tr key={i} className="font-bold">
-                      <td className="uppercase">{p.name}</td>
-                      <td className="text-center">{p.qty}</td>
-                      <td className="text-right text-amber-500 font-black">R$ {p.total.toLocaleString('pt-BR')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           )}
-
-           {periodSales.length === 0 && reportType !== 'entrega_futura' && (
+           {periodSales.length === 0 && (
               <div className="py-32 text-center">
                  <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">query_stats</span>
-                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhum dado localizado para o período e filtros atuais</p>
+                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em] mt-4">Nenhum dado localizado para o período selecionado</p>
               </div>
            )}
         </div>
