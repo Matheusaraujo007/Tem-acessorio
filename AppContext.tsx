@@ -21,7 +21,7 @@ interface AppContextType {
   serviceOrders: ServiceOrder[];
   establishments: Establishment[];
   loading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>;
+  login: (username: string, pass: string) => Promise<boolean>;
   logout: () => void;
   updateConfig: (config: SystemConfig) => Promise<void>;
   updateRolePermissions: (role: UserRole, perms: RolePermissions) => Promise<void>;
@@ -114,8 +114,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     fetch('/api/init-db').finally(() => refreshData());
   }, []);
 
-  const login = async (email: string, pass: string) => {
-    const user = users.find(u => u.email === email && u.password === pass);
+  const login = async (username: string, pass: string) => {
+    // Autenticação por NOME e SENHA (insensível a maiúsculas no nome)
+    const user = users.find(u => u.name.toLowerCase() === username.toLowerCase() && u.password === pass);
     if (user) { setCurrentUser(user); return true; }
     return false;
   };

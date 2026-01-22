@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 const Login: React.FC = () => {
   const { login, systemConfig, refreshData, users, addUser } = useApp();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,7 +14,7 @@ const Login: React.FC = () => {
   const [showResetModal, setShowResetModal] = useState(false);
 
   // Estados Reset Senha
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetName, setResetName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -23,11 +23,11 @@ const Login: React.FC = () => {
     setLoading(true);
     setError('');
     
-    const success = await login(email, password);
+    const success = await login(username, password);
     if (success) {
       navigate('/');
     } else {
-      setError('Credenciais inválidas. Verifique seu e-mail e senha.');
+      setError('Acesso negado. Verifique se o nome e a senha estão corretos.');
     }
     setLoading(false);
   };
@@ -38,7 +38,7 @@ const Login: React.FC = () => {
       const res = await fetch('/api/init-db');
       const data = await res.json();
       if (res.ok) {
-        alert("Sistema inicializado com sucesso! Use admin@erp.com / admin123");
+        alert("Sistema inicializado com sucesso! Use 'Administrador Sistema' / '123456'");
         await refreshData();
       } else {
         alert("Erro ao configurar: " + data.error);
@@ -57,9 +57,9 @@ const Login: React.FC = () => {
       return;
     }
     
-    const user = users.find(u => u.email.toLowerCase() === resetEmail.toLowerCase());
+    const user = users.find(u => u.name.toLowerCase() === resetName.toLowerCase());
     if (!user) {
-      alert("Usuário não localizado no sistema!");
+      alert("Colaborador não localizado no sistema!");
       return;
     }
 
@@ -67,7 +67,7 @@ const Login: React.FC = () => {
       await addUser({ ...user, password: newPassword });
       alert("Senha alterada com sucesso! Tente realizar o login.");
       setShowResetModal(false);
-      setResetEmail('');
+      setResetName('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (e) {
@@ -96,23 +96,23 @@ const Login: React.FC = () => {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs font-black text-center animate-in shake duration-300">
+            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-[10px] font-black text-center animate-in shake duration-300 uppercase tracking-widest">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">E-mail Corporativo</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome de Usuário</label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">mail</span>
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">person</span>
                 <input 
-                  type="email" 
+                  type="text" 
                   required 
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="w-full h-14 bg-white dark:bg-slate-800 border-none rounded-2xl pl-12 pr-6 text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                  placeholder="admin@erp.com"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  className="w-full h-14 bg-white dark:bg-slate-800 border-none rounded-2xl pl-12 pr-6 text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all uppercase"
+                  placeholder="DIGITE SEU NOME"
                 />
               </div>
             </div>
@@ -175,8 +175,8 @@ const Login: React.FC = () => {
              </div>
              <form onSubmit={handleResetPassword} className="p-10 space-y-5">
                 <div className="space-y-1">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirme seu E-mail</label>
-                   <input required value={resetEmail} onChange={e => setResetEmail(e.target.value)} type="email" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" placeholder="Ex: joao@empresa.com" />
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirme seu Nome de Usuário</label>
+                   <input required value={resetName} onChange={e => setResetName(e.target.value)} type="text" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none uppercase" placeholder="EX: CARLOS SILVA" />
                 </div>
                 <div className="space-y-1">
                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nova Senha</label>
