@@ -10,27 +10,28 @@ const Reports: React.FC = () => {
   const query = new URLSearchParams(location.search);
   const reportType = query.get('type') || 'evolucao';
 
-  const [period, setPeriod] = useState(30);
+  // Datas iniciais: últimos 30 dias
+  const todayStr = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+  const [startDate, setStartDate] = useState(thirtyDaysAgoStr);
+  const [endDate, setEndDate] = useState(todayStr);
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
   const currentStoreName = currentStore?.name || '';
 
-  const cutoffDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - period);
-    return d;
-  }, [period]);
-
-  // Transações base filtradas por período e unidade
+  // Transações filtradas pelo intervalo de datas do calendário
   const periodSales = useMemo(() => {
     return (transactions || []).filter(t => {
-      const tDate = new Date(t.date);
-      const isCorrectPeriod = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço') && tDate >= cutoffDate;
       const belongsToStore = isAdmin || t.store === currentStoreName;
-      return isCorrectPeriod && belongsToStore;
+      const isCorrectType = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
+      const inRange = t.date >= startDate && t.date <= endDate;
+      return belongsToStore && isCorrectType && inRange;
     });
-  }, [transactions, cutoffDate, isAdmin, currentStoreName]);
+  }, [transactions, startDate, endDate, isAdmin, currentStoreName]);
 
   // LÓGICAS DE PROCESSAMENTO PARA CADA TIPO DE RELATÓRIO
   
@@ -126,6 +127,11 @@ const Reports: React.FC = () => {
     return titles[type] || 'Relatório de Vendas';
   };
 
+  const setRangeToday = () => {
+    setStartDate(todayStr);
+    setEndDate(todayStr);
+  };
+
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
@@ -134,10 +140,33 @@ const Reports: React.FC = () => {
           <p className="text-slate-500 text-[10px] mt-2 font-black uppercase tracking-[0.2em]">Filtro Unidade: {isAdmin ? 'Global / Todas' : currentStoreName}</p>
         </div>
         
-        <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
-           {[7, 30, 90, 365].map(d => (
-             <button key={d} onClick={() => setPeriod(d)} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${period === d ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{d === 365 ? '1 ANO' : `${d} DIAS`}</button>
-           ))}
+        {/* SELETOR DE DATA PROFISSIONAL (CALENDÁRIO) */}
+        <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700">
+           <div className="flex items-center gap-2 px-3">
+              <span className="material-symbols-outlined text-slate-400 text-sm">calendar_month</span>
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={e => setStartDate(e.target.value)} 
+                className="bg-transparent border-none text-[10px] font-black uppercase text-slate-600 dark:text-slate-200 focus:ring-0 p-1"
+              />
+           </div>
+           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+           <div className="flex items-center gap-2 px-3">
+              <span className="material-symbols-outlined text-slate-400 text-sm">event</span>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={e => setEndDate(e.target.value)} 
+                className="bg-transparent border-none text-[10px] font-black uppercase text-slate-600 dark:text-slate-200 focus:ring-0 p-1"
+              />
+           </div>
+           <button 
+            onClick={setRangeToday}
+            className="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[9px] font-black uppercase rounded-xl hover:bg-primary hover:text-white transition-all ml-2"
+           >
+             Hoje
+           </button>
         </div>
       </div>
 
@@ -312,7 +341,7 @@ const Reports: React.FC = () => {
             {periodSales.length === 0 && (
               <div className="py-32 text-center space-y-4">
                  <span className="material-symbols-outlined text-8xl text-slate-100 dark:text-slate-800">query_stats</span>
-                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em]">Base de dados vazia para este filtro</p>
+                 <p className="uppercase font-black text-xs text-slate-300 tracking-[0.4em]">Base de dados vazia para este intervalo</p>
               </div>
             )}
          </div>
