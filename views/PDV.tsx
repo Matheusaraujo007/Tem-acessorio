@@ -46,6 +46,7 @@ const PDV: React.FC = () => {
   const [shippingValue, setShippingValue] = useState(0);
 
   // Estados Troca/Devolução/Cancelamento
+  const [priceInquirySearch, setPriceInquirySearch] = useState('');
   const [returnSearchCustomer, setReturnSearchCustomer] = useState('');
   const [cancelSearchId, setCancelSearchId] = useState('');
   const [selectedReturnCustomer, setSelectedReturnCustomer] = useState<Customer | null>(null);
@@ -241,7 +242,7 @@ const PDV: React.FC = () => {
 
     if (confirm(`Confirmar devolução de 1 unidade de "${item.name}"? O item retornará ao estoque.`)) {
        const product = products.find(p => p.id === item.id);
-       if (product) {
+       if (product && !product.isService) {
          await addProduct({ ...product, stock: product.stock + 1 });
        }
        await addTransaction({
@@ -329,6 +330,15 @@ const PDV: React.FC = () => {
       reader.readAsDataURL(file);
     }
   };
+
+  const inquiryResult = useMemo(() => {
+    if (priceInquirySearch.length < 2) return [];
+    return products.filter(p => 
+      p.name.toLowerCase().includes(priceInquirySearch.toLowerCase()) || 
+      p.sku.toLowerCase().includes(priceInquirySearch.toLowerCase()) || 
+      p.barcode?.includes(priceInquirySearch)
+    ).slice(0, 5);
+  }, [priceInquirySearch, products]);
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display">
@@ -557,6 +567,178 @@ const PDV: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL CONSULTA PREÇO */}
+      {showPriceInquiry && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b bg-slate-900 text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase">Consulta de Preço</h3>
+                 <button onClick={() => setShowPriceInquiry(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-8 space-y-6">
+                 <input 
+                   autoFocus 
+                   value={priceInquirySearch} 
+                   onChange={e => setPriceInquirySearch(e.target.value)} 
+                   placeholder="Digite o nome, SKU ou bipe o código..." 
+                   className="w-full h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl px-6 text-xl font-bold border-none" 
+                 />
+                 <div className="space-y-3">
+                    {inquiryResult.map(p => (
+                      <div key={p.id} className="flex justify-between items-center p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700">
+                         <div>
+                            <p className="text-lg font-black uppercase text-slate-800 dark:text-white leading-tight">{p.name}</p>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase">SKU: {p.sku} | Estoque: {p.stock} un</p>
+                         </div>
+                         <div className="text-right">
+                            <p className="text-3xl font-black text-primary tabular-nums">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
+                         </div>
+                      </div>
+                    ))}
+                    {priceInquirySearch.length >= 2 && inquiryResult.length === 0 && (
+                      <div className="py-10 text-center opacity-30 font-black uppercase text-xs">Produto não localizado</div>
+                    )}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CANCELAMENTO */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b bg-rose-500 text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase">Estorno de Venda</h3>
+                 <button onClick={() => setShowCancelModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                 <input 
+                   value={cancelSearchId} 
+                   onChange={e => setCancelSearchId(e.target.value)} 
+                   placeholder="Buscar venda por ID ou Cliente..." 
+                   className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none mb-4" 
+                 />
+                 <div className="space-y-3">
+                    {todaySales.map(s => (
+                      <div key={s.id} onClick={() => handleCancelSale(s)} className="p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl flex justify-between items-center cursor-pointer hover:bg-rose-50 transition-all border border-transparent hover:border-rose-500">
+                         <div>
+                            <p className="text-[10px] font-black text-rose-500 uppercase">#{s.id}</p>
+                            <p className="text-sm font-black uppercase text-slate-800 dark:text-white">{s.client || 'Consumidor Final'}</p>
+                            <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{s.date} | {s.method}</p>
+                         </div>
+                         <div className="text-right">
+                            <p className="text-lg font-black text-rose-500 tabular-nums">R$ {s.value.toLocaleString('pt-BR')}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase">Clique para Cancelar</p>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL TROCAS */}
+      {showReturnsModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b bg-amber-500 text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase">Troca & Devolução</h3>
+                 <button onClick={() => { setShowReturnsModal(false); setSelectedReturnCustomer(null); }} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                 {!selectedReturnCustomer ? (
+                   <div className="space-y-4">
+                      <p className="text-xs font-black uppercase text-slate-400 px-2">1. Localize o cliente da venda</p>
+                      <input 
+                        value={returnSearchCustomer} 
+                        onChange={e => setReturnSearchCustomer(e.target.value)} 
+                        placeholder="Nome do cliente..." 
+                        className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-bold border-none" 
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                         {customers.filter(c => c.name.toLowerCase().includes(returnSearchCustomer.toLowerCase())).slice(0, 10).map(c => (
+                           <button key={c.id} onClick={() => setSelectedReturnCustomer(c)} className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl text-left hover:bg-amber-50 transition-all border border-transparent hover:border-amber-500">
+                              <p className="text-sm font-black uppercase text-slate-800 dark:text-white">{c.name}</p>
+                              <p className="text-[10px] text-slate-400 font-bold">{c.phone}</p>
+                           </button>
+                         ))}
+                      </div>
+                   </div>
+                 ) : (
+                   <div className="space-y-6 animate-in slide-in-from-right-4">
+                      <div className="flex justify-between items-center">
+                         <button onClick={() => setSelectedReturnCustomer(null)} className="text-[10px] font-black uppercase text-amber-500">← Voltar para Busca</button>
+                         <p className="text-sm font-black uppercase">Compras de {selectedReturnCustomer.name}</p>
+                      </div>
+                      <div className="space-y-4">
+                         {customerSales.map(sale => (
+                           <div key={sale.id} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 space-y-4">
+                              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
+                                 <div><p className="text-[10px] font-black text-slate-400 uppercase">Venda #{sale.id}</p><p className="text-xs font-bold">{sale.date}</p></div>
+                                 <p className="text-lg font-black text-primary tabular-nums">R$ {sale.value.toLocaleString('pt-BR')}</p>
+                              </div>
+                              <div className="space-y-2">
+                                 {sale.items?.map((item, idx) => (
+                                   <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-slate-900 rounded-xl">
+                                      <span className="text-xs font-bold uppercase">{item.quantity}x {item.name}</span>
+                                      <button onClick={() => handleProcessReturn(sale, item)} className="px-4 py-1 bg-amber-500 text-white rounded-lg text-[10px] font-black uppercase">Trocar Item</button>
+                                   </div>
+                                 ))}
+                              </div>
+                           </div>
+                         ))}
+                         {customerSales.length === 0 && <div className="text-center py-20 opacity-20 uppercase font-black text-xs">Nenhuma venda registrada para este cliente</div>}
+                      </div>
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL CADASTRO RÁPIDO CLIENTE */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b bg-primary text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase">Novo Cliente Rápido</h3>
+                 <button onClick={() => setShowCustomerModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleQuickCustomerAdd} className="p-10 space-y-4">
+                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4">
+                    <button type="button" onClick={() => setCustomerModalTab('basic')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${customerModalTab === 'basic' ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>Básico</button>
+                    <button type="button" onClick={() => setCustomerModalTab('address')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${customerModalTab === 'address' ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>Endereço</button>
+                 </div>
+                 {customerModalTab === 'basic' ? (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                       <input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} placeholder="Nome Completo" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none uppercase" />
+                       <input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} placeholder="WhatsApp (DDD)" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                       <input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} placeholder="CPF/CNPJ" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                       <input value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} type="email" placeholder="E-mail (Opcional)" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                    </div>
+                 ) : (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                       <input value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} placeholder="CEP" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                       <div className="grid grid-cols-3 gap-2">
+                          <input value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value})} placeholder="Rua" className="col-span-2 h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                          <input value={customerForm.number} onChange={e => setCustomerForm({...customerForm, number: e.target.value})} placeholder="Nº" className="h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                       </div>
+                       <input value={customerForm.neighborhood} onChange={e => setCustomerForm({...customerForm, neighborhood: e.target.value})} placeholder="Bairro" className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                       <div className="grid grid-cols-2 gap-2">
+                          <input value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value})} placeholder="Cidade" className="h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none" />
+                          <input value={customerForm.state} onChange={e => setCustomerForm({...customerForm, state: e.target.value})} placeholder="UF" className="h-14 bg-slate-50 dark:bg-slate-800 rounded-xl px-6 font-bold border-none uppercase" />
+                       </div>
+                    </div>
+                 )}
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-[1.5rem] font-black text-xs uppercase shadow-xl mt-6">CADASTRAR E SELECIONAR</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL SUCESSO */}
       {showSuccessModal && (
         <div className={`fixed inset-0 z-[500] flex items-center justify-center animate-in fade-in duration-300 ${successType === 'OS' ? 'bg-amber-500' : successType === 'RETURN' ? 'bg-amber-600' : successType === 'CANCEL' ? 'bg-rose-500' : 'bg-emerald-500'}`}>
            <div className="text-center text-white space-y-8 animate-in zoom-in-50 duration-500 print:hidden">
@@ -581,7 +763,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* Outros Modais Manter... */}
+      {/* MODAL OS */}
       {showOSModal && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
@@ -607,7 +789,6 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* Outros componentes (Price Inquiry, Customer Modal, Returns, Cancel) se mantêm iguais... */}
       <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; } @media print { body * { visibility: hidden; } #receipt-print, #receipt-print * { visibility: visible; } #receipt-print { position: absolute; left: 0; top: 0; width: 100%; } }`}</style>
     </div>
   );
