@@ -101,6 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         {isReportsMenuOpen && (
                           <div className="flex flex-col ml-4 border-l border-slate-100 dark:border-slate-800 gap-0.5 my-1">
                             <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução de vendas" small />
+                            <SidebarSubItem to="/relatorios?type=vendas_unidade" label="Vendas por Unidade" small />
                             <SidebarSubItem to="/relatorios?type=entrega_futura" label="Entrega Futura" small />
                             <SidebarSubItem to="/relatorios?type=por_ano" label="Por ano" small />
                             <SidebarSubItem to="/relatorios?type=por_cliente" label="Por cliente" small />
