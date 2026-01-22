@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../AppContext';
 import { ServiceOrder, ServiceOrderStatus, UserRole, Product, TransactionStatus } from '../types';
 import { useLocation } from 'react-router-dom';
@@ -73,6 +73,10 @@ const ServiceOrders: React.FC = () => {
     }
   };
 
+  const handlePrintOS = () => {
+    window.print();
+  };
+
   const handlePriceChange = (field: string, value: number) => {
     setServiceForm(prev => {
       const next = { ...prev, [field]: value };
@@ -118,7 +122,87 @@ const ServiceOrders: React.FC = () => {
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+      
+      {/* TEMPLATE DE IMPRESSÃO DA OS */}
+      <div id="os-print-template" className="hidden print:block p-8 bg-white text-slate-900 font-sans text-xs">
+         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
+            <div className="flex items-center gap-4">
+               {currentStore?.logoUrl && <img src={currentStore.logoUrl} className="h-16 w-16 object-contain" />}
+               <div>
+                  <h1 className="text-xl font-black uppercase">{currentStore?.name}</h1>
+                  <p className="text-[10px] font-bold">{currentStore?.location}</p>
+                  <p className="text-[10px] font-bold">CNPJ: {currentStore?.cnpj}</p>
+               </div>
+            </div>
+            <div className="text-right">
+               <h2 className="text-2xl font-black text-primary">OS #{selectedOS?.id}</h2>
+               <p className="font-bold uppercase">Data: {selectedOS?.date}</p>
+               <p className="font-bold uppercase text-primary">Status: {selectedOS?.status}</p>
+            </div>
+         </div>
+
+         <div className="grid grid-cols-2 gap-8 mb-8">
+            <div className="p-4 border border-slate-200 rounded-xl">
+               <h4 className="text-[10px] font-black uppercase text-slate-400 mb-2">Dados do Cliente</h4>
+               <p className="text-sm font-black uppercase">{selectedOS?.customerName}</p>
+               <p className="text-[10px] font-bold mt-1 text-slate-500">ID Cliente: {selectedOS?.customerId}</p>
+            </div>
+            <div className="p-4 border border-slate-200 rounded-xl">
+               <h4 className="text-[10px] font-black uppercase text-slate-400 mb-2">Informações Técnicas</h4>
+               <p className="text-sm font-black uppercase">Técnico: {selectedOS?.technicianName || 'Não Informado'}</p>
+               <p className="text-[10px] font-bold mt-1 text-slate-500">Unidade: {selectedOS?.store}</p>
+            </div>
+         </div>
+
+         <div className="mb-8">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 mb-2 border-b pb-1">Descrição do Problema / Diagnóstico</h4>
+            <p className="text-sm font-medium leading-relaxed uppercase whitespace-pre-wrap">{selectedOS?.description}</p>
+         </div>
+
+         <div className="mb-8">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 mb-4 border-b pb-1">Peças e Mão de Obra</h4>
+            <table className="w-full text-left">
+               <thead>
+                  <tr className="border-b-2 border-slate-100">
+                     <th className="py-2 font-black uppercase text-[10px]">Item</th>
+                     <th className="py-2 text-center font-black uppercase text-[10px]">Qtd</th>
+                     <th className="py-2 text-right font-black uppercase text-[10px]">Unitário</th>
+                     <th className="py-2 text-right font-black uppercase text-[10px]">Total</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                  {selectedOS?.items.map((item, i) => (
+                    <tr key={i} className="text-[11px]">
+                       <td className="py-3 font-bold uppercase">{item.name}</td>
+                       <td className="py-3 text-center font-bold">{item.quantity}</td>
+                       <td className="py-3 text-right font-bold">R$ {item.salePrice.toLocaleString('pt-BR')}</td>
+                       <td className="py-3 text-right font-black">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</td>
+                    </tr>
+                  ))}
+               </tbody>
+               <tfoot>
+                  <tr className="border-t-2 border-slate-900">
+                     <td colSpan={3} className="py-4 text-right font-black text-sm uppercase">Valor Total da Ordem:</td>
+                     <td className="py-4 text-right font-black text-lg text-primary tabular-nums">R$ {selectedOS?.totalValue.toLocaleString('pt-BR')}</td>
+                  </tr>
+               </tfoot>
+            </table>
+         </div>
+
+         <div className="mt-20 grid grid-cols-2 gap-20 text-center">
+            <div className="border-t border-slate-900 pt-4">
+               <p className="text-[10px] font-black uppercase">{selectedOS?.technicianName || 'Assinatura Técnico'}</p>
+               <p className="text-[8px] text-slate-400">Responsável pela execução</p>
+            </div>
+            <div className="border-t border-slate-900 pt-4">
+               <p className="text-[10px] font-black uppercase">{selectedOS?.customerName}</p>
+               <p className="text-[8px] text-slate-400">Assinatura do Cliente</p>
+            </div>
+         </div>
+         <p className="text-center text-[8px] mt-20 opacity-30 uppercase font-black">Tem Acessorio ERP - Sistema de Gestão Inteligente</p>
+      </div>
+
+      <div className="flex flex-col md:flex-row justify-between items-start gap-4 print:hidden">
         <div>
           <h1 className="text-4xl font-black tracking-tighter uppercase">Gestão de Serviços</h1>
           <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mt-1">Ordens de serviço e catálogo de mão de obra</p>
@@ -132,7 +216,7 @@ const ServiceOrders: React.FC = () => {
       </div>
 
       {activeTab === 'list' && (
-        <div className="space-y-6">
+        <div className="space-y-6 print:hidden">
            <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
               {['TODAS', ...Object.values(ServiceOrderStatus)].map(s => (
                 <button key={s} onClick={() => setFilterStatus(s)} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase border-2 transition-all whitespace-nowrap ${filterStatus === s ? 'bg-slate-900 border-slate-900 text-white' : 'border-slate-200 text-slate-400'}`}>{s}</button>
@@ -157,7 +241,7 @@ const ServiceOrders: React.FC = () => {
       )}
 
       {activeTab === 'catalog' && (
-        <div className="space-y-6 animate-in slide-in-from-right-4">
+        <div className="space-y-6 animate-in slide-in-from-right-4 print:hidden">
            <div className="flex justify-between items-center px-4">
               <h3 className="text-xl font-black uppercase tracking-tight">Catálogo de Mão de Obra</h3>
               <button onClick={openNewService} className="px-10 py-4 bg-amber-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-2">
@@ -199,7 +283,7 @@ const ServiceOrders: React.FC = () => {
       )}
 
       {activeTab === 'create' && (
-        <div className="bg-white dark:bg-slate-900 p-12 rounded-[3rem] text-center border border-slate-200 dark:border-slate-800 space-y-8">
+        <div className="bg-white dark:bg-slate-900 p-12 rounded-[3rem] text-center border border-slate-200 dark:border-slate-800 space-y-8 print:hidden">
            <div className="size-24 bg-primary/10 text-primary rounded-[2rem] flex items-center justify-center mx-auto"><span className="material-symbols-outlined text-5xl">point_of_sale</span></div>
            <h2 className="text-2xl font-black uppercase">Deseja criar uma nova ordem?</h2>
            <p className="text-slate-500 max-w-sm mx-auto font-bold text-sm uppercase">Para criar uma OS, utilize o Frente de Caixa (PDV), selecione o serviço cadastrado e as peças, e clique em 'GERAR OS'.</p>
@@ -209,7 +293,7 @@ const ServiceOrders: React.FC = () => {
 
       {/* MODAL CADASTRO SERVIÇO - COM CALCULADORA DE PREÇO */}
       {showServiceModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
                  <div className="flex items-center gap-4">
@@ -293,8 +377,8 @@ const ServiceOrders: React.FC = () => {
       )}
 
       {selectedOS && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[700px]">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 print:hidden">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col md:flex-row h-[700px]">
               <div className="w-full md:w-[350px] bg-slate-50 dark:bg-slate-800/50 p-10 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                  <div className="space-y-8">
                     <button onClick={() => setSelectedOS(null)} className="text-slate-400 hover:text-rose-500 flex items-center gap-2 text-[10px] font-black uppercase"><span className="material-symbols-outlined text-lg">arrow_back</span> Voltar</button>
@@ -314,7 +398,7 @@ const ServiceOrders: React.FC = () => {
                       </div>
                     )}
                  </div>
-                 <button className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">print</span> Imprimir OS</button>
+                 <button onClick={handlePrintOS} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all"><span className="material-symbols-outlined text-lg">print</span> Imprimir OS</button>
               </div>
               <div className="flex-1 overflow-y-auto p-12 space-y-10 custom-scrollbar">
                  <div className="flex justify-between items-start">
@@ -346,7 +430,7 @@ const ServiceOrders: React.FC = () => {
       )}
 
       {showPaymentModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-emerald-500 text-white flex justify-between items-center">
                  <h3 className="text-2xl font-black uppercase tracking-tight">Recebimento OS</h3>
@@ -365,7 +449,15 @@ const ServiceOrders: React.FC = () => {
         </div>
       )}
 
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }`}</style>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+        @media print {
+           body * { visibility: hidden; }
+           #os-print-template, #os-print-template * { visibility: visible; }
+           #os-print-template { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+        }
+      `}</style>
     </div>
   );
 };

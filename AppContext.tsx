@@ -110,7 +110,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setRolePermissions(permsMap);
       }
 
-      // Após carregar os usuários, verifica se a sessão no localStorage ainda é válida
       const savedUser = localStorage.getItem(SESSION_KEY);
       const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
       
@@ -120,7 +119,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         if (inactiveTime < INACTIVITY_LIMIT) {
           const parsedUser = JSON.parse(savedUser) as User;
-          // Valida se o usuário ainda existe e a senha (caso tenha mudado) confere
           const latestUsers = responses[3] as User[];
           const validUser = latestUsers.find(u => u.id === parsedUser.id && u.password === parsedUser.password && u.active);
           
@@ -145,7 +143,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     fetch('/api/init-db').finally(() => refreshData());
   }, []);
 
-  // Monitor de Inatividade e Eventos Globais
   useEffect(() => {
     const handleGlobalClick = () => updateActivity();
     window.addEventListener('mousedown', handleGlobalClick);
@@ -159,7 +156,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           logout();
         }
       }
-    }, 60000); // Checa a cada minuto
+    }, 60000);
 
     return () => {
       window.removeEventListener('mousedown', handleGlobalClick);
@@ -193,7 +190,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { 
     await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); 
-    // Se o usuário editado for o atual, atualiza a sessão
     if (currentUser?.id === u.id) {
        localStorage.setItem(SESSION_KEY, JSON.stringify(u));
     }
@@ -202,17 +198,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue: number = 0, cardDetails?: any) => {
-    for (const item of items) {
-       const p = products.find(x => x.id === item.id);
-       if (p && !p.isService) {
-         await fetch('/api/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...p, stock: p.stock - item.quantity})});
-       }
-    }
+    // OTİMIZAÇÃO: Processa atualizações de estoque em paralelo
+    const stockUpdates = items
+      .filter(item => {
+        const p = products.find(x => x.id === item.id);
+        return p && !p.isService;
+      })
+      .map(item => {
+        const p = products.find(x => x.id === item.id)!;
+        return fetch('/api/products', {
+          method: 'POST', 
+          headers: {'Content-Type':'application/json'}, 
+          body: JSON.stringify({...p, stock: p.stock - item.quantity})
+        });
+      });
 
     const client = customers.find(c => c.id === clientId);
     const storeObj = establishments.find(e => e.id === currentUser?.storeId);
 
-    await addTransaction({
+    const transactionData = {
       id: `SALE-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       description: `Venda PDV`,
@@ -221,25 +225,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: TransactionStatus.PAID,
       value: total,
       shippingValue: shippingValue,
-      type: 'INCOME',
+      type: 'INCOME' as const,
       method,
       clientId,
       client: client?.name || 'Consumidor Final',
       vendorId,
       items,
       ...cardDetails
-    });
+    };
+
+    // Executa tudo em paralelo para máxima velocidade
+    await Promise.all([
+      ...stockUpdates,
+      fetch('/api/transactions', { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify(transactionData)
+      })
+    ]);
     
     await refreshData();
   };
 
   const bulkUpdateStock = async (adjustments: Record<string, number>) => {
-    for (const [id, newStock] of Object.entries(adjustments)) {
+    const updates = Object.entries(adjustments).map(([id, newStock]) => {
       const p = products.find(x => x.id === id);
       if (p) {
-        await addProduct({ ...p, stock: newStock });
+        return fetch('/api/products', { 
+          method: 'POST', 
+          headers: {'Content-Type': 'application/json'}, 
+          body: JSON.stringify({ ...p, stock: newStock })
+        });
       }
-    }
+      return Promise.resolve();
+    });
+    
+    await Promise.all(updates);
     await refreshData();
   };
 

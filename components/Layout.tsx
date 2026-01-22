@@ -1,5 +1,5 @@
 
-import React, { ReactNode, useState, useEffect } from 'react';
+import React, { ReactNode, useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { UserRole, RolePermissions } from '../types';
@@ -9,7 +9,7 @@ interface LayoutProps { children: ReactNode; }
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, systemConfig, rolePermissions } = useApp();
+  const { currentUser, logout, systemConfig, rolePermissions, establishments } = useApp();
   const isPDV = location.pathname === '/pdv';
   
   const [isStockOpen, setIsStockOpen] = useState(location.pathname.includes('estoque') || location.pathname.includes('balanco'));
@@ -21,6 +21,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     document.title = `${systemConfig.companyName} | Gestão Integrada`;
   }, [systemConfig.companyName]);
+
+  const currentStoreName = useMemo(() => {
+    if (!currentUser || !establishments) return '---';
+    const store = establishments.find(e => e.id === currentUser.storeId);
+    return store ? store.name : currentUser.storeId;
+  }, [currentUser, establishments]);
 
   if (!currentUser) return null;
 
@@ -175,7 +181,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <header className="h-16 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-end px-8">
            <div className="flex items-center gap-4">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade:</span>
-              <span className="text-xs font-black text-primary uppercase">{currentUser.storeId}</span>
+              <span className="text-xs font-black text-primary uppercase">{currentStoreName}</span>
            </div>
         </header>
         <div className="flex-1 overflow-y-auto custom-scrollbar">
