@@ -13,7 +13,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isPDV = location.pathname === '/pdv';
   
   const [isStockOpen, setIsStockOpen] = useState(location.pathname.includes('estoque') || location.pathname.includes('balanco'));
-  const [isVendasOpen, setIsVendasOpen] = useState(location.pathname.includes('pdv') || location.pathname.includes('clientes'));
+  const [isVendasOpen, setIsVendasOpen] = useState(location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios'));
+  const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(location.pathname.includes('relatorios'));
   const [isFinancialOpen, setIsFinancialOpen] = useState(location.pathname.includes('entradas') || location.pathname.includes('saidas') || location.pathname.includes('dre'));
   const [isOSOpen, setIsOSOpen] = useState(location.pathname.includes('servicos'));
 
@@ -33,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display">
-      <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50">
+      <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50 overflow-y-auto no-scrollbar">
         <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3 px-2">
             {systemConfig.logoUrl ? (
@@ -84,7 +85,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {isVendasOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l border-slate-100 dark:border-slate-800 gap-1">
                     {perms.customers && <SidebarSubItem to="/clientes" label="Clientes" />}
-                    {perms.reports && <SidebarSubItem to="/relatorios" label="Relatórios" />}
+                    
+                    {perms.reports && (
+                      <div className="flex flex-col">
+                        <button onClick={() => setIsReportsMenuOpen(!isReportsMenuOpen)} className="flex items-center justify-between px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-primary transition-all">
+                          <span>Vendas (Relatórios)</span>
+                          <span className={`material-symbols-outlined text-xs transition-transform ${isReportsMenuOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                        {isReportsMenuOpen && (
+                          <div className="flex flex-col ml-4 border-l border-slate-100 dark:border-slate-800 gap-0.5 my-1">
+                            <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução de vendas" small />
+                            <SidebarSubItem to="/relatorios?type=entrega_futura" label="Entrega Futura" small />
+                            <SidebarSubItem to="/relatorios?type=por_ano" label="Por ano" small />
+                            <SidebarSubItem to="/relatorios?type=por_cliente" label="Por cliente" small />
+                            <SidebarSubItem to="/relatorios?type=por_vendas" label="Por vendas" small />
+                            <SidebarSubItem to="/relatorios?type=por_vendedor" label="Por vendedor" small />
+                            <SidebarSubItem to="/relatorios?type=ticket_vendedor" label="Ticket médio por vendedor" small />
+                            <SidebarSubItem to="/relatorios?type=ticket_periodo" label="Ticket médio por mês/ano" small />
+                            <SidebarSubItem to="/relatorios?type=por_produto" label="Por produto" small />
+                            <SidebarSubItem to="/relatorios?type=margem_bruta" label="Por produto com margem bruta" small />
+                            <SidebarSubItem to="/relatorios?type=por_servico" label="Por serviço" small />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -131,7 +155,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </nav>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+        <div className="pt-4 mt-8 border-t border-slate-100 dark:border-slate-800 space-y-4">
            <div className="flex items-center gap-3 px-2 py-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
               <div className="size-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-black">
                  {currentUser.name.charAt(0)}
@@ -172,10 +196,10 @@ const SidebarItem: React.FC<{ to: string; icon: string; label: string }> = ({ to
   </NavLink>
 );
 
-const SidebarSubItem: React.FC<{ to: string; label: string }> = ({ to, label }) => (
+const SidebarSubItem: React.FC<{ to: string; label: string; small?: boolean }> = ({ to, label, small }) => (
   <NavLink 
     to={to} 
-    className={({ isActive }) => `px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${isActive ? 'text-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
+    className={({ isActive }) => `${small ? 'px-4 py-1 text-[9px]' : 'px-4 py-2 text-[10px]'} font-bold uppercase tracking-widest transition-all ${isActive ? 'text-primary bg-primary/5 rounded-r-lg border-l-2 border-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
   >
     {label}
   </NavLink>

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../AppContext';
 import { Product, TransactionStatus, UserRole } from '../types';
 
@@ -12,11 +12,9 @@ const Inventory: React.FC = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const currentStore = establishments.find(e => e.id === currentUser?.storeId);
-
   const [form, setForm] = useState<Partial<Product>>({
-    name: '', sku: '', barcode: '', category: '', brand: '', costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: '', image: '', isService: false
+    name: '', sku: '', barcode: '', category: '', brand: '', costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: '', image: '', isService: false,
+    minStock: 0, otherCostsPercent: 0, marginPercent: 0, maxDiscountPercent: 0, commissionPercent: 0, conversionFactor: 1, weight: '0'
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,21 +31,33 @@ const Inventory: React.FC = () => {
     });
   }, [products, filter, categoryFilter, typeFilter]);
 
-  // Cálculo de Margem em tempo real
-  const margin = useMemo(() => {
-    if (!form.costPrice || !form.salePrice) return 0;
-    const profit = form.salePrice - form.costPrice;
-    return (profit / form.costPrice) * 100;
-  }, [form.costPrice, form.salePrice]);
+  const handlePriceChange = (field: string, value: number) => {
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      const cost = Number(next.costPrice) || 0;
+      const others = Number(next.otherCostsPercent) || 0;
+      
+      if (field === 'salePrice') {
+        const totalCost = cost * (1 + others / 100);
+        if (totalCost > 0) {
+           next.marginPercent = Number(((value / totalCost - 1) * 100).toFixed(2));
+        }
+      } else {
+        const margin = Number(next.marginPercent) || 0;
+        next.salePrice = Number((cost * (1 + others / 100) * (1 + margin / 100)).toFixed(2));
+      }
+      return next;
+    });
+  };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalImage = form.image || (form.isService ? 'https://picsum.photos/seed/service/400/400' : `https://picsum.photos/seed/${form.sku || Date.now()}/400/400`);
+    const finalImage = form.image || `https://picsum.photos/seed/${form.sku || Date.now()}/400/400`;
     const productData = { 
       ...form as Product, 
       id: editingId || `prod-${Date.now()}`, 
       image: finalImage,
-      stock: form.isService ? 999999 : (form.stock || 0)
+      isService: false
     };
     
     await addProduct(productData);
@@ -68,16 +78,8 @@ const Inventory: React.FC = () => {
     setEditingId(null);
     setForm({ 
       name: '', sku: `SKU-${Date.now()}`, barcode: '', category: '', brand: '', 
-      costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: '', image: '', isService: false 
-    });
-    setShowProductModal(true);
-  };
-
-  const openNewService = () => {
-    setEditingId(null);
-    setForm({ 
-      name: '', sku: `SRV-${Date.now()}`, category: 'Serviços', isService: true, 
-      stock: 999999, salePrice: 0, costPrice: 0, unit: 'UN' 
+      costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: '', image: '', isService: false,
+      minStock: 0, otherCostsPercent: 0, marginPercent: 0, maxDiscountPercent: 0, commissionPercent: 0, conversionFactor: 1, weight: '0'
     });
     setShowProductModal(true);
   };
@@ -87,13 +89,10 @@ const Inventory: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Inventário & Catálogo</h2>
-          <p className="text-slate-500 text-sm mt-1 font-bold uppercase tracking-tight">Controle central de ativos e serviços</p>
+          <p className="text-slate-500 text-sm mt-1 font-bold uppercase tracking-tight">Controle central de ativos e mercadorias</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={openNewService} className="flex items-center gap-2 bg-amber-500 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/20 hover:scale-105 transition-all">
-            <span className="material-symbols-outlined text-lg">build</span> Novo Serviço
-          </button>
-          <button onClick={openNewProduct} className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+          <button onClick={openNewProduct} className="flex items-center gap-2 bg-primary text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
             <span className="material-symbols-outlined text-lg">add_shopping_cart</span> Novo Produto
           </button>
         </div>
@@ -157,7 +156,7 @@ const Inventory: React.FC = () => {
                       <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-4 py-2 rounded-xl">Mão de Obra</span>
                     ) : (
                       <div className="flex flex-col items-center">
-                        <span className={`text-sm font-black tabular-nums ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock}</span>
+                        <span className={`text-sm font-black tabular-nums ${p.stock <= (p.minStock || 0) ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock}</span>
                         <span className="text-[9px] font-black text-slate-400 uppercase">{p.unit} • {p.location || 'S/ Loc.'}</span>
                       </div>
                     )}
@@ -177,97 +176,115 @@ const Inventory: React.FC = () => {
 
       {showProductModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-            <div className={`p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center text-white ${form.isService ? 'bg-amber-500' : 'bg-primary'}`}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[95vh]">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center text-white bg-primary">
               <div className="flex items-center gap-4">
-                 <span className="material-symbols-outlined text-3xl">{form.isService ? 'construction' : 'inventory_2'}</span>
-                 <h3 className="text-2xl font-black uppercase tracking-tight">{editingId ? 'Editar Registro' : (form.isService ? 'Novo Serviço' : 'Novo Produto')}</h3>
+                 <span className="material-symbols-outlined text-3xl">inventory_2</span>
+                 <h3 className="text-xl font-black uppercase tracking-tight">{editingId ? 'Editar Produto' : 'Novo Produto Mercadoria'}</h3>
               </div>
               <button onClick={() => setShowProductModal(false)} className="size-10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all"><span className="material-symbols-outlined">close</span></button>
             </div>
             
-            <form onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-10">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                 <div className="lg:col-span-4 space-y-8">
-                    <div className="space-y-4">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Identidade Visual</p>
-                       <div className="aspect-square w-full bg-slate-50 dark:bg-slate-800 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center overflow-hidden relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                          {form.image ? (
-                             <img src={form.image} className="size-full object-cover" />
-                          ) : (
-                             <>
-                                <span className="material-symbols-outlined text-6xl text-slate-300">add_photo_alternate</span>
-                                <span className="text-[10px] font-black text-slate-400 uppercase mt-2">Upload Imagem</span>
-                             </>
-                          )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-black text-xs uppercase">Trocar Foto</div>
-                       </div>
-                       <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="image/*" />
+            <form onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                 <div className="md:col-span-1">
+                    <div className="aspect-square size-32 mx-auto bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center overflow-hidden relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                       {form.image ? <img src={form.image} className="size-full object-cover" /> : <span className="material-symbols-outlined text-3xl text-slate-300">add_photo_alternate</span>}
+                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-black uppercase">Foto</div>
                     </div>
-                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl space-y-4">
-                       <p className="text-[10px] font-black text-primary uppercase tracking-widest text-center">Resumo do Cadastro</p>
-                       <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                          <span className="text-[10px] font-black text-slate-400 uppercase">Margem Bruta</span>
-                          <span className={`text-sm font-black ${margin >= 30 ? 'text-emerald-500' : 'text-amber-500'}`}>{margin.toFixed(1)}%</span>
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="image/*" />
+                 </div>
+                 <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2 space-y-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">Descrição Completa</label>
+                       <input type="text" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-bold uppercase" />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">Código Interno (ID)</label>
+                       <input readOnly value={form.id || 'NOVO'} className="w-full h-12 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 text-sm font-black text-slate-400" />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">UN</label>
+                       <input type="text" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-black uppercase" />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">Tipo</label>
+                       <input readOnly value="Normal" className="w-full h-12 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 text-sm font-black text-slate-400 uppercase" />
+                    </div>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                 <div className="lg:col-span-5 space-y-6">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3">Estoque</h4>
+                       <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
+                          <table className="w-full text-left text-[10px]">
+                             <thead className="bg-slate-50 dark:bg-slate-800">
+                                <tr>
+                                   <th className="px-4 py-3 font-black uppercase text-slate-400">Setor - Localização principal</th>
+                                   <th className="px-4 py-3 font-black uppercase text-slate-400 text-right">Estoque</th>
+                                </tr>
+                             </thead>
+                             <tbody>
+                                <tr>
+                                   <td className="px-4 py-3 font-bold uppercase text-slate-600 dark:text-slate-300">
+                                      <input type="text" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full bg-transparent border-none p-0 text-[10px] focus:ring-0 uppercase" placeholder="GERAL" />
+                                   </td>
+                                   <td className="px-4 py-3 font-black text-right tabular-nums">
+                                      <input type="number" value={form.stock} onChange={e => setForm({...form, stock: parseInt(e.target.value) || 0})} className="w-20 bg-transparent border-none p-0 text-right text-[10px] font-black focus:ring-0" />
+                                   </td>
+                                </tr>
+                             </tbody>
+                          </table>
                        </div>
-                       <div className="flex justify-between">
-                          <span className="text-[10px] font-black text-slate-400 uppercase">Lucro por Un.</span>
-                          <span className="text-sm font-black text-slate-900 dark:text-white">R$ {( (form.salePrice || 0) - (form.costPrice || 0) ).toLocaleString('pt-BR')}</span>
+                       <div className="grid grid-cols-2 gap-4 pt-2">
+                          <div className="space-y-1">
+                             <label className="text-[9px] font-black text-slate-400 uppercase px-2">Estoque Mínimo</label>
+                             <input type="number" value={form.minStock} onChange={e => setForm({...form, minStock: parseInt(e.target.value) || 0})} className="w-full h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black" />
+                          </div>
+                          <div className="space-y-1">
+                             <label className="text-[9px] font-black text-slate-400 uppercase px-2">Estoque Total</label>
+                             <div className="w-full h-10 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 text-xs font-black flex items-center justify-end text-slate-500">{form.stock}</div>
+                          </div>
                        </div>
                     </div>
                  </div>
-                 <div className="lg:col-span-8 space-y-10">
-                    <div className="space-y-6">
-                       <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                          <span className="material-symbols-outlined text-slate-400 text-lg">info</span>
-                          <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest">Informação Básica</h4>
-                       </div>
+
+                 <div className="lg:col-span-4 space-y-6">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-primary/20 shadow-lg space-y-6">
+                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3">Cálculo do Preço de Venda</h4>
                        <div className="space-y-4">
-                          <div className="space-y-1.5">
-                             <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Nome Comercial / Descrição</label>
-                             <input type="text" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase focus:ring-2 focus:ring-primary/20" />
+                          <div className="flex items-center justify-between">
+                             <label className="text-[10px] font-black text-slate-500 uppercase">Preço Custo R$</label>
+                             <input type="number" step="0.01" value={form.costPrice} onChange={e => handlePriceChange('costPrice', parseFloat(e.target.value) || 0)} className="w-32 h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-black tabular-nums text-rose-500" />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Categoria</label>
-                                <input type="text" value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-black uppercase" placeholder="Ex: Acessórios" />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Marca / Fabricante</label>
-                                <input type="text" value={form.brand} onChange={e => setForm({...form, brand: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-black uppercase" placeholder="Ex: Samsung" />
-                             </div>
+                          <div className="flex items-center justify-between">
+                             <label className="text-[10px] font-black text-slate-500 uppercase">Margem %</label>
+                             <input type="number" step="0.01" value={form.marginPercent} onChange={e => handlePriceChange('marginPercent', parseFloat(e.target.value) || 0)} className="w-32 h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-black tabular-nums text-amber-500" />
+                          </div>
+                          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                             <label className="text-[10px] font-black text-primary uppercase">Preço Venda R$</label>
+                             <input type="number" step="0.01" value={form.salePrice} onChange={e => handlePriceChange('salePrice', parseFloat(e.target.value) || 0)} className="w-40 h-12 bg-primary/10 border-2 border-primary/20 rounded-xl px-4 text-right font-black text-lg text-primary tabular-nums" />
                           </div>
                        </div>
                     </div>
-                    <div className="space-y-6">
-                       <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                          <span className="material-symbols-outlined text-slate-400 text-lg">payments</span>
-                          <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest">Precificação</h4>
-                       </div>
-                       <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                          <div className="space-y-1.5">
-                             <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Preço de Custo (R$)</label>
-                             <input type="number" step="0.01" required value={form.costPrice} onChange={e => setForm({...form, costPrice: parseFloat(e.target.value)})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-lg font-black text-rose-500 tabular-nums" />
-                          </div>
-                          <div className="space-y-1.5">
-                             <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Preço de Venda (R$)</label>
-                             <input type="number" step="0.01" required value={form.salePrice} onChange={e => setForm({...form, salePrice: parseFloat(e.target.value)})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-lg font-black text-primary tabular-nums" />
-                          </div>
-                          <div className="space-y-1.5">
-                             <label className="text-[10px] font-black text-slate-400 uppercase px-4 tracking-widest">Unidade</label>
-                             <select value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-black uppercase">
-                                <option value="UN">UNIDADE (UN)</option>
-                                <option value="H">HORA (H)</option>
-                                <option value="SERV">SERVIÇO (SERV)</option>
-                             </select>
-                          </div>
+                 </div>
+
+                 <div className="lg:col-span-3 space-y-6">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 space-y-4">
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase px-2">Código de Barras</label>
+                          <input type="text" value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-mono font-black" />
                        </div>
                     </div>
                  </div>
               </div>
-              <div className="pt-10 border-t border-slate-100 dark:border-slate-800">
-                 <button type="submit" className={`w-full h-20 rounded-[2.5rem] font-black text-sm uppercase tracking-widest shadow-2xl transition-all active:scale-95 text-white ${form.isService ? 'bg-amber-500 shadow-amber-500/20' : 'bg-primary shadow-primary/20'}`}>
-                    {editingId ? 'Confirmar Alterações' : (form.isService ? 'Cadastrar Novo Serviço' : 'Efetivar Cadastro de Produto')}
+
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-4">
+                 <button type="button" onClick={() => setShowProductModal(false)} className="px-10 py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+                 <button type="submit" className="px-12 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all active:scale-95 text-white bg-primary shadow-primary/20">
+                    {editingId ? 'Salvar Alterações' : 'Confirmar e Efetivar Cadastro'}
                  </button>
               </div>
             </form>

@@ -18,6 +18,14 @@ export default async function handler(req: any, res: any) {
 
     // Migrações
     try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_service BOOLEAN DEFAULT FALSE`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock INTEGER DEFAULT 0`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS other_costs_percent NUMERIC DEFAULT 0`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS margin_percent NUMERIC DEFAULT 0`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS max_discount_percent NUMERIC DEFAULT 0`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS commission_percent NUMERIC DEFAULT 0`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS conversion_factor NUMERIC DEFAULT 1`; } catch(e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS weight NUMERIC DEFAULT 0`; } catch(e) {}
+
     try { await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS shipping_value NUMERIC DEFAULT 0`; } catch(e) {}
     try { await sql`ALTER TABLE establishments ADD COLUMN IF NOT EXISTS logo_url TEXT`; } catch(e) {}
     try { await sql`ALTER TABLE system_configs ADD COLUMN IF NOT EXISTS return_period_days INTEGER DEFAULT 30`; } catch(e) {}

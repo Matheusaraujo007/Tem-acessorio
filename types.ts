@@ -14,6 +14,12 @@ export interface Product {
   weight?: string;
   location?: string;
   isService?: boolean;
+  minStock?: number;
+  otherCostsPercent?: number;
+  marginPercent?: number;
+  maxDiscountPercent?: number;
+  commissionPercent?: number;
+  conversionFactor?: number;
 }
 
 export interface CartItem extends Product {
