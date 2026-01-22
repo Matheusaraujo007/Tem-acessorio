@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { Product, Transaction, TransactionStatus, Customer, User, CartItem, Establishment, UserRole, RolePermissions, ServiceOrder, ServiceOrderStatus } from './types';
 
 interface SystemConfig {
@@ -52,8 +52,11 @@ const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
   [UserRole.VENDOR]: { dashboard: true, pdv: true, customers: true, reports: false, inventory: false, balance: false, incomes: false, expenses: false, financial: false, settings: false, serviceOrders: true },
 };
 
+const SESSION_KEY = 'tem_acessorios_user_session';
+const LAST_ACTIVITY_KEY = 'tem_acessorios_last_activity';
+const INACTIVITY_LIMIT = 60 * 60 * 1000; // 1 hora em milissegundos
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Alterado para null para exigir login
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [rolePermissions, setRolePermissions] = useState<Record<UserRole, RolePermissions>>(INITIAL_PERMS);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
@@ -67,6 +70,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [users, setUsers] = useState<User[]>([]);
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const logout = useCallback(() => {
+    setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
+  }, []);
+
+  const updateActivity = useCallback(() => {
+    if (currentUser) {
+      localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+    }
+  }, [currentUser]);
 
   const refreshData = async () => {
     try {
@@ -94,6 +109,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         responses[7].forEach((p: any) => { permsMap[p.role as UserRole] = p.permissions; });
         setRolePermissions(permsMap);
       }
+
+      // Após carregar os usuários, verifica se a sessão no localStorage ainda é válida
+      const savedUser = localStorage.getItem(SESSION_KEY);
+      const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
+      
+      if (savedUser && lastActivity) {
+        const now = Date.now();
+        const inactiveTime = now - parseInt(lastActivity);
+        
+        if (inactiveTime < INACTIVITY_LIMIT) {
+          const parsedUser = JSON.parse(savedUser) as User;
+          // Valida se o usuário ainda existe e a senha (caso tenha mudado) confere
+          const latestUsers = responses[3] as User[];
+          const validUser = latestUsers.find(u => u.id === parsedUser.id && u.password === parsedUser.password && u.active);
+          
+          if (validUser) {
+            setCurrentUser(validUser);
+            updateActivity();
+          } else {
+            logout();
+          }
+        } else {
+          logout();
+        }
+      }
     } catch (error) {
       console.error("Erro na sincronização:", error);
     } finally {
@@ -105,14 +145,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     fetch('/api/init-db').finally(() => refreshData());
   }, []);
 
+  // Monitor de Inatividade e Eventos Globais
+  useEffect(() => {
+    const handleGlobalClick = () => updateActivity();
+    window.addEventListener('mousedown', handleGlobalClick);
+    window.addEventListener('keydown', handleGlobalClick);
+
+    const interval = setInterval(() => {
+      const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
+      if (lastActivity && currentUser) {
+        const inactiveTime = Date.now() - parseInt(lastActivity);
+        if (inactiveTime > INACTIVITY_LIMIT) {
+          logout();
+        }
+      }
+    }, 60000); // Checa a cada minuto
+
+    return () => {
+      window.removeEventListener('mousedown', handleGlobalClick);
+      window.removeEventListener('keydown', handleGlobalClick);
+      clearInterval(interval);
+    };
+  }, [currentUser, logout, updateActivity]);
+
   const login = async (username: string, pass: string) => {
-    // Autenticação por NOME e SENHA (insensível a maiúsculas no nome)
     const user = users.find(u => u.name.toLowerCase() === username.toLowerCase() && u.password === pass);
-    if (user) { setCurrentUser(user); return true; }
+    if (user && user.active) {
+      setCurrentUser(user);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+      return true;
+    }
     return false;
   };
-
-  const logout = () => setCurrentUser(null);
 
   const addServiceOrder = async (os: ServiceOrder) => {
     await fetch('/api/service-orders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(os)});
@@ -126,7 +191,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
   const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
-  const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
+  const addUser = async (u: User) => { 
+    await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); 
+    // Se o usuário editado for o atual, atualiza a sessão
+    if (currentUser?.id === u.id) {
+       localStorage.setItem(SESSION_KEY, JSON.stringify(u));
+    }
+    await refreshData(); 
+  };
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
 
   const processSale = async (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue: number = 0, cardDetails?: any) => {
