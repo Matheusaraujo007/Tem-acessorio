@@ -6,7 +6,8 @@ export default async function handler(req: any, res: any) {
   const sql = neon(process.env.DATABASE_URL);
 
   if (req.method === 'GET') {
-    const data = await sql`SELECT * FROM transactions ORDER BY date DESC LIMIT 100`;
+    // Aumentado o limite para 5000 para suportar relatórios analíticos completos
+    const data = await sql`SELECT * FROM transactions ORDER BY date DESC LIMIT 5000`;
     const mapped = data.map(t => ({
       id: t.id,
       date: t.date,
